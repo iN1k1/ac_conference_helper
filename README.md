@@ -27,11 +27,11 @@ PASSWORD=<YOUR-PASSWORD>
 ### Step 2: 
 Run the script to log into your account, gather submission info, and print it.
 
-For CVPR 2025, try this:
+For CVPR 2026, try this:
 ```bash
->> python run.py --conf cvpr_2025 --headless
+>> python run.py --conf cvpr_2026 --headless
 
-Opening https://openreview.net/group?id=thecvf.com/CVPR/2025/Conference/Area_Chairs
+Opening https://openreview.net/group?id=thecvf.com/CVPR/2026/Conference/Area_Chairs
 Logging in.
 Waiting for page to finish loading...
 Logged in.
@@ -39,20 +39,6 @@ Found 15 submissions.
 1, 1234, To boop or not to boop?, 2, 3
 ...
 15, 214, Ursidae are all you need, 4, 4
-```
-
-For ICLR 2025, try this:
-```bash
->> python run.py --conf iclr_2025 --headless
-
-Opening https://openreview.net/group?id=ICLR.cc/2025/Conference/Area_Chairs
-Logging in.
-Waiting for page to finish loading...
-Logged in.
-Found 14 submissions.
-1, 1234, Discovering the most boopable snoots, 8, 9, 10, 10
-...
-14, 4321, To boop or not to boop?, 5, 5, 4, 1
 ```
 
 Skip `--headless` if you want to watch it do the web navigation.  

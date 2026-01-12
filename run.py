@@ -2,6 +2,7 @@ import argparse
 import os
 import random
 import string
+import time
 from dataclasses import dataclass
 
 import numpy as np
@@ -41,8 +42,7 @@ class Submission:
 
 class ORAPI:
     conf_to_url = {
-        "iclr_2025": "https://openreview.net/group?id=ICLR.cc/2025/Conference/Area_Chairs",
-        "cvpr_2025": "https://openreview.net/group?id=thecvf.com/CVPR/2025/Conference/Area_Chairs",
+        "cvpr_2026": "https://openreview.net/group?id=thecvf.com/CVPR/2026/Conference/Area_Chairs",
         # Add new ones here.
     }
 
@@ -82,6 +82,7 @@ class ORAPI:
         # Log in and navigate to url.
         print(f"Opening {url}")
         self.driver.get(url)
+        time.sleep(1)
         self.driver.find_element(By.ID, "email-input").send_keys(username)
         self.driver.find_element(By.ID, "password-input").send_keys(password)
         self.driver.find_element(By.CLASS_NAME, "btn-login").click()
@@ -125,7 +126,7 @@ class ORAPI:
                     confidence = int(content[confidence_start:code_start].split(":")[1].strip())
 
             elif "cvpr" in self.conf:
-                rating_start = content.find("Overall Recommendation: ")
+                rating_start = content.find("Preliminary Recommendation: ")
                 if rating_start > 0:
                     just_start = content.find("Justification For Recommendation And Suggestions For Rebuttal: ")
                     conf_start = content.find("Confidence Level: ")
@@ -251,7 +252,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip_reviews", action="store_true",
                         help="Skip reviews? Select if no reviews are in yet.")
     parser.add_argument("--conf", type=str,
-                        default="iclr_2025", choices=list(ORAPI.conf_to_url.keys()))
+                        default="cvpr_2026", choices=list(ORAPI.conf_to_url.keys()))
     parser.add_argument("--simulate", action="store_true",
                         help="Simulate the process.")
     args = parser.parse_args()
