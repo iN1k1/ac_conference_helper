@@ -1,16 +1,27 @@
 """Data models for conference submission data."""
 
-from dataclasses import dataclass
 from typing import Optional, List
+from pydantic import BaseModel, Field
 
 import numpy as np
 import pandas as pd
 
-from utils import int_list_to_str
+# Import logging configuration
+from logging_config import get_logger
+
+# Configure structured logging
+logger = get_logger(__name__)
 
 
-@dataclass
-class Review:
+def int_list_to_str(ints: list[int]) -> str:
+    """Convert list of integers to string representation."""
+    output = ", ".join([str(item) for item in ints])
+    if not output:
+        output = "-"
+    return output
+
+
+class Review(BaseModel):
     """Class containing detailed review information."""
 
     reviewer_id: Optional[str] = None
@@ -27,7 +38,9 @@ class Review:
     final_justification: Optional[str] = None
     raw_content: Optional[str] = None  # Store original HTML content for parsing
 
-    def _extract_numeric_rating(self, recommendation_text: Optional[str]) -> Optional[int]:
+    def _extract_numeric_rating(
+        self, recommendation_text: Optional[str]
+    ) -> Optional[int]:
         """Helper method to extract numeric rating from recommendation text."""
         if not recommendation_text:
             return -1
@@ -75,6 +88,27 @@ class Review:
 
         match = re.search(r"(\d+)", self.confidence_level)
         return int(match.group(1)) if match else None
+
+    def model_dump(self) -> dict:
+        """Return model as dict with computed properties."""
+        return {
+            "reviewer_id": self.reviewer_id,
+            "submission_date": self.submission_date,
+            "modified_date": self.modified_date,
+            "paper_summary": self.paper_summary,
+            "preliminary_recommendation": self.preliminary_recommendation,
+            "justification_for_recommendation": self.justification_for_recommendation,
+            "confidence_level": self.confidence_level,
+            "paper_strengths": self.paper_strengths,
+            "major_weaknesses": self.major_weaknesses,
+            "minor_weaknesses": self.minor_weaknesses,
+            "final_recommendation": self.final_recommendation,
+            "final_justification": self.final_justification,
+            "raw_content": self.raw_content,
+            "numeric_rating_final_reccomendation": self.numeric_rating_final_reccomendation,
+            "numeric_rating_preliminary_recommendation": self.numeric_rating_preliminary_recommendation,
+            "numeric_confidence": self.numeric_confidence,
+        }
 
     def __str__(self) -> str:
         """String representation uses pretty print by default."""
@@ -181,23 +215,62 @@ class Review:
         print(f"{'='*60}\n")
 
 
-@dataclass
-class Submission:
+class Submission(BaseModel):
     """Class containing submission details."""
 
     title: str
     sub_id: str
     url: str
-    ratings: list[int]
-    confidences: list[int]
-    final_ratings: list[int]
-    reviews: List[Review] = None  # New field for detailed reviews
+    reviews: List[Review] = Field(default_factory=list)  # Detailed reviews
+    pdf_url: Optional[str] = None  # Store PDF URL
+    rebuttal_url: Optional[str] = None  # Store rebuttal URL
 
-    def __post_init__(self):
+    model_config = {
+        "arbitrary_types_allowed": True  # Allow numpy arrays in computed properties
+    }
+
+    @property
+    def final_ratings(self) -> list[int]:
+        """Extract all final ratings from reviews."""
+        final_ratings = []
+        for review in self.reviews:
+            final_rating = review.numeric_rating_final_reccomendation
+            if final_rating is not None:
+                final_ratings.append(final_rating)
+        return final_ratings
+
+    @property
+    def ratings(self) -> list[int]:
+        """Extract all ratings from reviews."""
+        ratings = []
+        for review in self.reviews:
+            rating = review.numeric_rating_preliminary_recommendation
+            if rating is not None:
+                ratings.append(rating)
+        return ratings
+
+    @property
+    def confidences(self) -> list[int]:
+        """Extract all confidences from reviews."""
+        confidences = []
+        for review in self.reviews:
+            confidence = review.numeric_confidence
+            if confidence is not None:
+                confidences.append(confidence)
+        return confidences
+
+    @property
+    def final_ratings(self) -> list[int]:
+        """Extract all final ratings from reviews."""
+        final_ratings = []
+        for review in self.reviews:
+            final_rating = review.numeric_rating_final_reccomendation
+            if final_rating is not None:
+                final_ratings.append(final_rating)
+        return final_ratings
+
+    def model_post_init(self, __context):
         """Validate data after initialization."""
-        if self.reviews is None:
-            self.reviews = []
-
         if len(self.ratings) != len(self.confidences):
             raise ValueError("Ratings and confidences must have same length")
 
@@ -225,6 +298,27 @@ class Submission:
     def detailed_reviews_count(self) -> int:
         """Get count of detailed reviews."""
         return len([r for r in self.reviews if r.final_recommendation])
+
+    def model_dump(self) -> dict:
+        """Return model as dict with computed properties."""
+        return {
+            "title": self.title,
+            "sub_id": self.sub_id,
+            "url": self.url,
+            "ratings": self.ratings,
+            "confidences": self.confidences,
+            "final_ratings": self.final_ratings,
+            "reviews": [review.model_dump() for review in self.reviews],
+            "avg_rating": self.avg_rating,
+            "std_rating": self.std_rating,
+            "avg_final_rating": self.avg_final_rating,
+            "std_final_rating": self.std_final_rating,
+            "detailed_reviews_count": self.detailed_reviews_count,
+            "has_pdf": self.pdf_url is not None,
+            "has_rebuttal": self.rebuttal_url is not None,
+            "pdf_url": self.pdf_url,
+            "rebuttal_url": self.rebuttal_url,
+        }
 
     def __str__(self) -> str:
         """String representation uses pretty print by default."""

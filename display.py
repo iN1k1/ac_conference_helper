@@ -30,26 +30,68 @@ def submissions_to_dataframe(
     """Convert submissions list to pandas DataFrame with color coding."""
     data = []
     for idx, sub in enumerate(subs):
-        # Determine color based on ratings
-        prelim_color = Colors.GREEN if len(sub.ratings) >= 3 else Colors.RED
-        final_color = Colors.GREEN if len(sub.final_ratings) >= 3 else Colors.RED
+        # Count valid ratings (excluding -1 values)
+        valid_prelim_ratings = [r for r in sub.ratings if r != -1]
+        valid_final_ratings = [r for r in sub.final_ratings if r != -1]
+        
+        # Determine color based on valid ratings - color is green if both have >= 3 valid ratings
+        line_color = Colors.GREEN if (len(valid_prelim_ratings) >= 3 and len(valid_final_ratings) >= 3) else Colors.RED
 
         # Create URL link if available
         url_link = ""
         if include_urls and hasattr(sub, "url"):
             url_link = f"{Colors.BLUE}{sub.url}{Colors.END}"
 
+        # Apply color to all text fields in the row
+        data.append(
+            {
+                "#": f"{line_color}{idx + 1}{Colors.END}",
+                "ID": f"{line_color}{sub.sub_id}{Colors.END}",
+                "Title": f"{line_color}{sub.title}{Colors.END}",
+                "URL": url_link if url_link else f"{line_color}{Colors.END}",
+                "Ratings": f"{line_color}{int_list_to_str(sub.ratings)}{Colors.END}",
+                "Avg_Rating": f"{line_color}{sub.avg_rating:.2f}{Colors.END}",
+                "Std_Rating": f"{line_color}{sub.std_rating:.2f}{Colors.END}",
+                "Confidences": f"{line_color}{int_list_to_str(sub.confidences)}{Colors.END}",
+                "Final_Ratings": f"{line_color}{int_list_to_str(sub.final_ratings)}{Colors.END}",
+                "Avg_Final": f"{line_color}{sub.avg_final_rating:.2f}{Colors.END}",
+                "Std_Final": f"{line_color}{sub.std_final_rating:.2f}{Colors.END}",
+            }
+        )
+    return pd.DataFrame(data)
+
+
+def submissions_to_dataframe_streamlit(
+    subs: list[Submission], include_urls: bool = False
+) -> pd.DataFrame:
+    """Convert submissions list to pandas DataFrame for Streamlit display without ANSI colors."""
+    data = []
+    for idx, sub in enumerate(subs):
+        # Count valid ratings (excluding -1 values)
+        valid_prelim_ratings = [r for r in sub.ratings if r != -1]
+        valid_final_ratings = [r for r in sub.final_ratings if r != -1]
+        
+        # Determine status based on valid ratings
+        status = "✅ Complete" if (len(valid_prelim_ratings) >= 3 and len(valid_final_ratings) >= 3) else "⚠️ Incomplete"
+
+        # Create URL link if available
+        url_link = ""
+        if include_urls and hasattr(sub, "url"):
+            url_link = sub.url
+
+        # Add data without ANSI colors
         data.append(
             {
                 "#": idx + 1,
                 "ID": sub.sub_id,
                 "Title": sub.title,
-                "URL": url_link,
-                "Ratings": f"{prelim_color}{int_list_to_str(sub.ratings)}{Colors.END}",
+                "URL": url_link if url_link else "",
+                "Status": status,
+                "Ratings": int_list_to_str(sub.ratings),
                 "Avg_Rating": f"{sub.avg_rating:.2f}",
                 "Std_Rating": f"{sub.std_rating:.2f}",
                 "Confidences": int_list_to_str(sub.confidences),
-                "Final_Ratings": f"{final_color}{int_list_to_str(sub.final_ratings)}{Colors.END}",
+                "Final_Ratings": int_list_to_str(sub.final_ratings),
                 "Avg_Final": f"{sub.avg_final_rating:.2f}",
                 "Std_Final": f"{sub.std_final_rating:.2f}",
             }
@@ -161,6 +203,29 @@ def parse_display_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def print_incomplete_ratings_table(
+    subs: list[Submission], table_format: str = "grid", include_urls: bool = False
+) -> None:
+    """Print table showing only submissions with incomplete ratings (< 3 valid ratings or final ratings)."""
+    # Filter submissions with incomplete ratings (excluding -1 values)
+    incomplete_subs = []
+    for sub in subs:
+        valid_prelim_ratings = [r for r in sub.ratings if r != -1]
+        valid_final_ratings = [r for r in sub.final_ratings if r != -1]
+        if len(valid_prelim_ratings) < 3 or len(valid_final_ratings) < 3:
+            incomplete_subs.append(sub)
+    
+    if not incomplete_subs:
+        print(f"\n{Colors.GREEN}All submissions have complete ratings (≥ 3 ratings and final ratings){Colors.END}")
+        return
+    
+    print(f"\n{Colors.YELLOW}Submissions with Incomplete Ratings ({len(incomplete_subs)} submissions){Colors.END}")
+    print(f"{Colors.YELLOW}Showing submissions with < 3 ratings or < 3 final ratings{Colors.END}\n")
+    
+    df = submissions_to_dataframe(incomplete_subs, include_urls=include_urls)
+    print_table_with_format(df, table_format)
+
+
 def display_results(
     subs: list[Submission], args: Optional[argparse.Namespace] = None
 ) -> None:
@@ -178,6 +243,9 @@ def display_results(
 
     if not csv_only:
         print_table(subs, table_format, include_urls=include_urls)
+        
+        # Show incomplete ratings table
+        print_incomplete_ratings_table(subs, table_format, include_urls=include_urls)
 
     print_csv(subs, include_urls=include_urls)
 

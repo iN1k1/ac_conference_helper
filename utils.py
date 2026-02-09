@@ -14,26 +14,12 @@ try:
 except ImportError:
     SELENIUM_AVAILABLE = False
 
-# Configure structlog
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer()
-    ],
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    wrapper_class=structlog.stdlib.BoundLogger,
-    cache_logger_on_first_use=True,
-)
+# Import logging configuration
+from logging_config import configure_logger, get_logger
 
-logger = structlog.get_logger()
+# Configure logging
+configure_logger()
+logger = get_logger(__name__)
 
 
 class TimeoutExpired(Exception):
@@ -84,7 +70,9 @@ def run_with_timeout(func, args=(), kwargs={}, timeout_duration=10, default_outp
 
 
 def int_list_to_str(ints: list[int]) -> str:
-    output = ", ".join([str(item) for item in ints])
+    # Filter out -1 values (representing missing/invalid ratings)
+    valid_ratings = [item for item in ints if item != -1]
+    output = ", ".join([str(item) for item in valid_ratings])
     if not output:
         output = "-"
     return output
