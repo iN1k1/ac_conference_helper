@@ -6,8 +6,8 @@ from typing import Optional
 import pandas as pd
 from tabulate import tabulate
 
-from models import Submission
-from utils import int_list_to_str
+from ac_conference_helper.core.models import Submission
+from ac_conference_helper.core.models import int_list_to_str
 
 
 # ANSI color codes for terminal output
@@ -255,7 +255,7 @@ def display_results(
 
 if __name__ == "__main__":
     # Demo with sample data
-    from models import Submission
+    from ac_conference_helper.core.models import Submission
     import random
     import string
 

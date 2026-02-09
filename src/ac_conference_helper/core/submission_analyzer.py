@@ -6,12 +6,12 @@ import json
 import os
 from tqdm import tqdm
 
-from models import Submission, Review
-from llm_integration import OllamaClient, create_llm_client_from_env
-from constants import AVAILABLE_ANALYSES
+from ac_conference_helper.core.models import Submission, Review
+from ac_conference_helper.core.llm_integration import OllamaClient, create_llm_client_from_env
+from ac_conference_helper.config.constants import AVAILABLE_ANALYSES
 
 # Import logging configuration
-from logging_config import get_logger
+from ac_conference_helper.utils.logging_config import get_logger
 
 # Configure structured logging
 logger = get_logger(__name__)

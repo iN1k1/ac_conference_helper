@@ -15,7 +15,7 @@ except ImportError:
     SELENIUM_AVAILABLE = False
 
 # Import logging configuration
-from logging_config import configure_logger, get_logger
+from ac_conference_helper.utils.logging_config import configure_logger, get_logger
 
 # Configure logging
 configure_logger()

@@ -9,16 +9,16 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from models import Submission
-from submission_analyzer import SubmissionAnalyzer
-from constants import AVAILABLE_ANALYSES
-from llm_integration import create_llm_client_from_env
-from chat_system import SubmissionChatSystem, ChatSession
-from display import submissions_to_dataframe_streamlit, print_table_with_format
-from utils import int_list_to_str
+from ac_conference_helper.core.models import Submission
+from ac_conference_helper.core.submission_analyzer import SubmissionAnalyzer
+from ac_conference_helper.config.constants import AVAILABLE_ANALYSES
+from ac_conference_helper.core.llm_integration import create_llm_client_from_env
+from ac_conference_helper.core.chat_system import SubmissionChatSystem, ChatSession
+from ac_conference_helper.core.display import submissions_to_dataframe_streamlit, print_table_with_format
+from ac_conference_helper.core.models import int_list_to_str
 
 # Import logging configuration
-from logging_config import get_logger
+from ac_conference_helper.utils.logging_config import get_logger
 
 # Configure structured logging
 logger = get_logger(__name__)

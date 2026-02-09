@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
-from utils import (
+from ac_conference_helper.utils.utils import (
     timeout,
     wait_for_page_load,
     wait_for_url_change,
@@ -18,15 +18,15 @@ from utils import (
 )
 
 # Import logging configuration
-from logging_config import get_logger
+from ac_conference_helper.utils.logging_config import get_logger
 
 # Configure structured logging
 logger = get_logger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
-from models import Submission, Review
-from conference_config import get_conference_config, ConferenceConfig
+from ac_conference_helper.core.models import Submission, Review
+from ac_conference_helper.config.conference_config import get_conference_config, ConferenceConfig
 
 
 class OpenReviewClient:

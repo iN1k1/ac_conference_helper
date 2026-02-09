@@ -18,6 +18,37 @@ uv sync
 # That's it! uv creates a virtual environment and installs everything.
 ```
 
+## 📁 Project Structure
+
+```
+conference_helper/
+├── src/ac_conference_helper/     # Main package
+│   ├── client/                  # External API clients
+│   │   └── openreview_client.py
+│   ├── config/                  # Configuration modules
+│   │   ├── conference_config.py
+│   │   └── constants.py
+│   ├── core/                    # Core functionality
+│   │   ├── models.py
+│   │   ├── display.py
+│   │   ├── chat_system.py
+│   │   ├── submission_analyzer.py
+│   │   └── llm_integration.py
+│   ├── ui/                      # User interfaces
+│   │   └── streamlit_chat.py
+│   └── utils/                   # Utilities
+│       ├── utils.py
+│       └── logging_config.py
+├── scripts/                     # Executable scripts
+│   ├── run.py                  # Main CLI script
+│   └── run_tests.py            # Test runner
+├── tests/                       # Test files
+├── docs/                        # Documentation
+├── cache/                       # Cached data
+├── pyproject.toml              # Project configuration
+└── README.md                   # This file
+```
+
 ## 📋 Setup Guide
 
 ### Step 1: Configure Credentials
@@ -56,16 +87,16 @@ CACHE_FILE_PREFIX=submissions_
 ### Step 2: Fetch Conference Data
 ```bash
 # Basic usage
-uv run python run.py --conf cvpr_2026
+uv run python scripts/run.py --conf cvpr_2026
 
 # Skip reviews for faster loading
-uv run python run.py --conf cvpr_2026 --skip-reviews
+uv run python scripts/run.py --conf cvpr_2026 --skip-reviews
 
 # Save results to CSV
-uv run python run.py --conf cvpr_2026 --output results.csv
+uv run python scripts/run.py --conf cvpr_2026 --output results.csv
 
 # Simulate with dummy data (for testing)
-uv run python run.py --simulate
+uv run python scripts/run.py --simulate
 ```
 
 #### Available Arguments
@@ -87,15 +118,15 @@ uv run python run.py --simulate
 
 **Method 1: Direct Streamlit launch**
 ```bash
-uv run streamlit run streamlit_chat.py
+uv run streamlit run src/ac_conference_helper/ui/streamlit_chat.py
 ```
 
 **Method 2: Using run.py chat mode**
 ```bash
-uv run python run.py --chat
+uv run python scripts/run.py --chat
 ```
 
-Both methods will launch the same Streamlit web interface at `http://localhost:8501`.
+Both methods will launch the same Streamlit web interface at `http://localhost:8501`. The `--chat` flag automatically launches the Streamlit interface from the correct package location.
 
 ## 🌐 Web Interface
 

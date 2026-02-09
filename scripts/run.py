@@ -3,10 +3,15 @@ import os
 import random
 import string
 import pickle
+import sys
+from pathlib import Path
 from typing import Optional
 
+# Add src to Python path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 # Import logging configuration
-from logging_config import get_logger, configure_logger
+from ac_conference_helper.utils.logging_config import get_logger, configure_logger
 
 # Configure structured logging
 logger = get_logger(__name__)
@@ -16,16 +21,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from models import Submission
-from display import display_results
-from submission_analyzer import SubmissionAnalyzer
-from constants import AVAILABLE_ANALYSES
-from chat_system import SubmissionChatSystem
-from conference_config import (
+from ac_conference_helper.core.models import Submission
+from ac_conference_helper.core.display import display_results
+from ac_conference_helper.core.submission_analyzer import SubmissionAnalyzer
+from ac_conference_helper.config.constants import AVAILABLE_ANALYSES
+from ac_conference_helper.core.chat_system import SubmissionChatSystem
+from ac_conference_helper.config.conference_config import (
     list_available_conferences,
     get_default_conference,
 )
-from openreview_client import OpenReviewClient
+from ac_conference_helper.client.openreview_client import OpenReviewClient
 
 TIMEOUT_DURATION = 6
 
@@ -185,7 +190,7 @@ def main() -> None:
         # Launch streamlit
         import subprocess
         import sys
-        subprocess.run([sys.executable, "-m", "streamlit", "run", "streamlit_chat.py"])
+        subprocess.run([sys.executable, "-m", "streamlit", "run", "src/ac_conference_helper/ui/streamlit_chat.py"])
         return
 
     # Handle LLM analysis

@@ -8,12 +8,12 @@ import numpy as np
 import pandas as pd
 from tabulate import tabulate
 
-from models import Submission
-from submission_analyzer import EnhancedSubmission, SubmissionAnalyzer
-from llm_integration import create_llm_client_from_env
+from ac_conference_helper.core.models import Submission
+from ac_conference_helper.core.submission_analyzer import EnhancedSubmission, SubmissionAnalyzer
+from ac_conference_helper.core.llm_integration import create_llm_client_from_env
 
 # Import logging configuration
-from logging_config import get_logger
+from ac_conference_helper.utils.logging_config import get_logger
 
 # Configure structured logging
 logger = get_logger(__name__)

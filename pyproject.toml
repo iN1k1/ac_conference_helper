@@ -16,4 +16,12 @@ dependencies = [
     "requests",
     "numpy",
     "ollama>=0.3.0",
+    "watchdog"
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+ac-conference-helper = "scripts.run:main"

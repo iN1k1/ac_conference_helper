@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 # Import logging configuration
-from logging_config import get_logger
+from ac_conference_helper.utils.logging_config import get_logger
 
 # Configure structured logging
 logger = get_logger(__name__)

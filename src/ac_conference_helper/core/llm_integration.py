@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import time
 from dotenv import load_dotenv
 
-from constants import AVAILABLE_ANALYSES
+from ac_conference_helper.config.constants import AVAILABLE_ANALYSES
 
 # Load environment variables
 load_dotenv()
