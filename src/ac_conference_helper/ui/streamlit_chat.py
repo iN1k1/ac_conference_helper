@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 # Page configuration
 st.set_page_config(
-    page_title="Conference Submission Analyzer",
+    page_title="Conference Submission Analyzer Dashboard",
     page_icon="📚",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -226,7 +226,7 @@ def main():
                 )
 
                 # Create compact info row
-                info_cols = st.columns(6)
+                info_cols = st.columns(7)
                 with info_cols[0]:
                     st.metric("Avg Rating", f"{current_submission.avg_rating:.2f}")
                 with info_cols[1]:
@@ -237,13 +237,26 @@ def main():
                     st.metric("Reviews", len(current_submission.reviews))
                 with info_cols[3]:
                     st.write("**Status:**")
-                    st.write(status)
+                    if current_submission.withdrawn:
+                        st.error("🚫 Withdrawn")
+                    else:
+                        st.success("✅ Active")
                 with info_cols[4]:
                     st.write("**Valid Prelim:**")
                     st.write(f"{len(valid_prelim_ratings)}")
                 with info_cols[5]:
                     st.write("**Valid Final:**")
                     st.write(f"{len(valid_final_ratings)}")
+                with info_cols[6]:
+                    st.write("**Complete:**")
+                    complete_status = (
+                        "✅ Complete"
+                        if (
+                            len(valid_prelim_ratings) >= 3 and len(valid_final_ratings) >= 3
+                        )
+                        else "⚠️ Incomplete"
+                    )
+                    st.write(complete_status)
 
                 # Compact URLs row
                 url_cols = st.columns(2)
@@ -259,6 +272,62 @@ def main():
                         and current_submission.rebuttal_url
                     ):
                         st.markdown(f"📄 [Rebuttal]({current_submission.rebuttal_url})")
+
+                # Add meta-review information if available
+                if (
+                    hasattr(current_submission, "meta_review")
+                    and current_submission.meta_review
+                ):
+                    st.subheader("📋 Meta Review")
+                    
+                    # Create two columns for preliminary and final decisions
+                    decision_cols = st.columns(2)
+                    
+                    with decision_cols[0]:
+                        st.write("**Preliminary Decision:**")
+                        if current_submission.meta_review.preliminary_decision:
+                            decision = current_submission.meta_review.preliminary_decision.lower()
+                            if "accept" in decision:
+                                if "clear" in decision or "strong" in decision:
+                                    st.success(f"✅ {current_submission.meta_review.preliminary_decision}")
+                                else:
+                                    st.info(f"📝 {current_submission.meta_review.preliminary_decision}")
+                            elif "reject" in decision:
+                                if "clear" in decision or "strong" in decision:
+                                    st.error(f"❌ {current_submission.meta_review.preliminary_decision}")
+                                else:
+                                    st.warning(f"⚠️ {current_submission.meta_review.preliminary_decision}")
+                            elif "discussion" in decision:
+                                st.warning(f"🔄 {current_submission.meta_review.preliminary_decision}")
+                            else:
+                                st.write(current_submission.meta_review.preliminary_decision)
+                        else:
+                            st.write("N/A")
+                    
+                    with decision_cols[1]:
+                        st.write("**Final Decision:**")
+                        if current_submission.meta_review.final_decision:
+                            decision = current_submission.meta_review.final_decision.lower()
+                            if "accept" in decision:
+                                if "clear" in decision or "strong" in decision:
+                                    st.success(f"✅ {current_submission.meta_review.final_decision}")
+                                else:
+                                    st.info(f"📝 {current_submission.meta_review.final_decision}")
+                            elif "reject" in decision:
+                                if "clear" in decision or "strong" in decision:
+                                    st.error(f"❌ {current_submission.meta_review.final_decision}")
+                                else:
+                                    st.warning(f"⚠️ {current_submission.meta_review.final_decision}")
+                            elif "discussion" in decision:
+                                st.warning(f"🔄 {current_submission.meta_review.final_decision}")
+                            else:
+                                st.write(current_submission.meta_review.final_decision)
+                        else:
+                            st.write("N/A")
+                    
+                    if current_submission.meta_review.content:
+                        with st.expander("📄 Meta Review Content", expanded=False):
+                            st.write(current_submission.meta_review.content)
 
                 # Add reviewers table
                 if current_submission.reviews:
@@ -293,6 +362,62 @@ def main():
 
                     reviewers_df = pd.DataFrame(reviewer_data)
                     st.dataframe(reviewers_df, width="stretch", hide_index=True)
+                    
+                    # Add review content sections
+                    st.subheader("📝 Review Content")
+                    for i, review in enumerate(current_submission.reviews):
+                        reviewer_name = review.reviewer_id or f"Reviewer_{i+1}"
+                        with st.expander(f"📄 {reviewer_name} - Review Details", expanded=False):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.write("**Ratings & Recommendations**")
+                                if review.numeric_rating_preliminary_recommendation != -1:
+                                    st.write(f"📊 Preliminary Rating: {review.numeric_rating_preliminary_recommendation}")
+                                if review.numeric_rating_final_reccomendation != -1:
+                                    st.write(f"📊 Final Rating: {review.numeric_rating_final_reccomendation}")
+                                if review.confidence_level:
+                                    st.write(f"🎯 Confidence: {review.confidence_level}")
+                                
+                                st.write("**Recommendations**")
+                                if review.preliminary_recommendation:
+                                    st.write(f"📝 Preliminary: {review.preliminary_recommendation}")
+                                if review.final_recommendation:
+                                    st.write(f"📝 Final: {review.final_recommendation}")
+                            
+                            with col2:
+                                st.write("**Review Content**")
+                                if review.paper_summary:
+                                    st.write("**📄 Summary:**")
+                                    st.write(review.paper_summary)
+                                
+                                if review.justification_for_recommendation:
+                                    st.write("**💭 Justification:**")
+                                    st.write(review.justification_for_recommendation)
+                                
+                                if review.final_justification:
+                                    st.write("**💭 Final Justification:**")
+                                    st.write(review.final_justification)
+                                
+                                if review.paper_strengths:
+                                    st.write("**💪 Strengths:**")
+                                    st.write(review.paper_strengths)
+                                
+                                if review.major_weaknesses:
+                                    st.write("**⚠️ Major Weaknesses:**")
+                                    st.write(review.major_weaknesses)
+                                
+                                if review.minor_weaknesses:
+                                    st.write("**⚠️ Minor Weaknesses:**")
+                                    st.write(review.minor_weaknesses)
+                            
+                            # Add submission info if available
+                            if review.submission_date or review.modified_date:
+                                st.write("**📅 Timeline:**")
+                                if review.submission_date:
+                                    st.write(f"Submitted: {review.submission_date}")
+                                if review.modified_date:
+                                    st.write(f"Modified: {review.modified_date}")
 
             with col2:
                 # Quick analysis buttons
@@ -334,6 +459,11 @@ def main():
                             st.session_state.last_improvements = enhanced.llm_analyses[
                                 0
                             ].result
+
+                if current_submission.url:
+                    st.markdown(f'🔗 <a href="{current_submission.url}" target="_blank" rel="noopener noreferrer">Open in OpenReview</a>', unsafe_allow_html=True)
+                else:
+                    st.warning("No OpenReview link available for this submission")
 
             # Display analysis results
             if hasattr(st.session_state, "last_summary"):
@@ -487,6 +617,137 @@ def main():
 
             with col4:
                 st.metric("Std Dev Final", f"{pd.Series(all_final_ratings).std():.2f}")
+
+        # Meta-Review Decision Statistics
+        st.subheader("📋 Meta-Review Decision Analysis")
+        
+        # Count meta-review decisions
+        prelim_accept = 0
+        prelim_reject = 0
+        prelim_discussion = 0
+        final_accept = 0
+        final_reject = 0
+        final_discussion = 0
+        
+        for sub in st.session_state.submissions:
+            if sub.meta_review:
+                # Preliminary decisions
+                if sub.meta_review.preliminary_decision:
+                    prelim_lower = sub.meta_review.preliminary_decision.lower()
+                    if "accept" in prelim_lower:
+                        prelim_accept += 1
+                    elif "reject" in prelim_lower:
+                        prelim_reject += 1
+                    elif "discussion" in prelim_lower:
+                        prelim_discussion += 1
+                
+                # Final decisions
+                if sub.meta_review.final_decision:
+                    final_lower = sub.meta_review.final_decision.lower()
+                    if "accept" in final_lower:
+                        final_accept += 1
+                    elif "reject" in final_lower:
+                        final_reject += 1
+                    elif "discussion" in final_lower:
+                        final_discussion += 1
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Preliminary Meta-Review Decisions**")
+            meta_prelim_data = {
+                "Accept": prelim_accept,
+                "Reject": prelim_reject,
+                "Discussion": prelim_discussion
+            }
+            st.bar_chart(meta_prelim_data)
+            
+            # Calculate percentages
+            total_prelim = prelim_accept + prelim_reject + prelim_discussion
+            if total_prelim > 0:
+                st.write(f"✅ Accept: {prelim_accept} ({prelim_accept/total_prelim*100:.1f}%)")
+                st.write(f"❌ Reject: {prelim_reject} ({prelim_reject/total_prelim*100:.1f}%)")
+                st.write(f"🔄 Discussion: {prelim_discussion} ({prelim_discussion/total_prelim*100:.1f}%)")
+            else:
+                st.write("No preliminary meta-review decisions found")
+        
+        with col2:
+            st.write("**Final Meta-Review Decisions**")
+            meta_final_data = {
+                "Accept": final_accept,
+                "Reject": final_reject,
+                "Discussion": final_discussion
+            }
+            st.bar_chart(meta_final_data)
+            
+            # Calculate percentages
+            total_final = final_accept + final_reject + final_discussion
+            if total_final > 0:
+                st.write(f"✅ Accept: {final_accept} ({final_accept/total_final*100:.1f}%)")
+                st.write(f"❌ Reject: {final_reject} ({final_reject/total_final*100:.1f}%)")
+                st.write(f"🔄 Discussion: {final_discussion} ({final_discussion/total_final*100:.1f}%)")
+            else:
+                st.write("No final meta-review decisions found")
+
+        # Withdrawal Statistics
+        st.subheader("🚫 Withdrawal Analysis")
+        
+        withdrawn_count = sum(1 for sub in st.session_state.submissions if sub.withdrawn)
+        active_count = len(st.session_state.submissions) - withdrawn_count
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Total Papers", len(st.session_state.submissions))
+        with col2:
+            st.metric("🚫 Withdrawn", withdrawn_count)
+        with col3:
+            st.metric("✅ Active", active_count)
+        
+        if withdrawn_count > 0:
+            withdrawal_percentage = (withdrawn_count / len(st.session_state.submissions)) * 100
+            st.warning(f"📊 Withdrawal Rate: {withdrawal_percentage:.1f}%")
+        
+        # Rating Improvement Analysis
+        st.subheader("📈 Rating Improvement Analysis")
+        
+        # Add threshold slider
+        threshold = st.slider("Rating Threshold", min_value=1.0, max_value=6.0, value=4.0, step=0.1)
+        
+        improved_papers = []
+        declined_papers = []
+        
+        for sub in st.session_state.submissions:
+            if sub.avg_rating > 0 and sub.avg_final_rating > 0:
+                if sub.avg_rating <= threshold and sub.avg_final_rating > threshold:
+                    improved_papers.append(sub)
+                elif sub.avg_rating > threshold and sub.avg_final_rating <= threshold:
+                    declined_papers.append(sub)
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(f"📈 Below {threshold} → Above {threshold}", len(improved_papers))
+        with col2:
+            st.metric(f"📉 Above {threshold} → Below {threshold}", len(declined_papers))
+        with col3:
+            papers_with_ratings = len([s for s in st.session_state.submissions if s.avg_rating > 0 and s.avg_final_rating > 0])
+            improvement_rate = (len(improved_papers) / papers_with_ratings) * 100 if papers_with_ratings > 0 else 0
+            st.metric("📊 Improvement Rate", f"{improvement_rate:.1f}%")
+        with col4:
+            decline_rate = (len(declined_papers) / papers_with_ratings) * 100 if papers_with_ratings > 0 else 0
+            st.metric("📉 Decline Rate", f"{decline_rate:.1f}%")
+        
+        # Show detailed lists if there are papers
+        if improved_papers:
+            with st.expander(f"📈 Papers that improved from ≤{threshold} to >{threshold}", expanded=False):
+                for sub in improved_papers:
+                    st.write(f"• {sub.sub_id}: {sub.avg_rating:.2f} → {sub.avg_final_rating:.2f} (+{sub.avg_final_rating - sub.avg_rating:.2f})")
+        
+        if declined_papers:
+            with st.expander(f"📉 Papers that declined from >{threshold} to ≤{threshold}", expanded=False):
+                for sub in declined_papers:
+                    st.write(f"• {sub.sub_id}: {sub.avg_rating:.2f} → {sub.avg_final_rating:.2f} ({sub.avg_final_rating - sub.avg_rating:.2f})")
 
         # Top and bottom submissions
         st.subheader("🏆 Top & Bottom Performers")

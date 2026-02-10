@@ -109,13 +109,13 @@ def wait_for_page_load(element_id: str, content_selector: str = ".note", timeout
                     
                     # Wait for main element to be present
                     wait = WebDriverWait(self.driver, timeout)
-                    main_element = wait.until(
+                    wait.until(
                         EC.presence_of_element_located((By.ID, element_id))
                     )
                     
                     # Wait for content to be loaded (re-find to avoid stale elements)
                     wait.until(
-                        lambda driver: driver.find_element(By.ID, element_id).find_elements(By.CSS_SELECTOR, content_selector)
+                        lambda driver: len(driver.find_element(By.ID, element_id).find_elements(By.CSS_SELECTOR, content_selector)) > 0
                     )
                     
                     logger.info("Page loaded successfully", element_id=element_id, attempt=attempt + 1)

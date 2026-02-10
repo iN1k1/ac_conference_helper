@@ -2,30 +2,27 @@
 
 import re
 import os
-import time
 from typing import List, Optional
-
-import requests
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options as ChromeOptions
 
 from ac_conference_helper.utils.utils import (
-    timeout,
     wait_for_page_load,
-    wait_for_url_change,
     navigate_and_wait,
 )
 
 # Import logging configuration
 from ac_conference_helper.utils.logging_config import get_logger
+from tqdm import tqdm
 
 # Configure structured logging
 logger = get_logger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
-from ac_conference_helper.core.models import Submission, Review
+from ac_conference_helper.core.models import Submission, Review, MetaReview
 from ac_conference_helper.config.conference_config import get_conference_config, ConferenceConfig
 
 
@@ -53,14 +50,39 @@ class OpenReviewClient:
 
     def __del__(self):
         if hasattr(self, "driver"):
-            self.driver.quit()
+            try:
+                self.driver.quit()
+            except Exception as e:
+                logger.warning("Error quitting driver during cleanup", error=str(e))
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with proper cleanup."""
+        try:
+            if hasattr(self, "driver"):
+                self.driver.quit()
+                logger.info("WebDriver properly closed")
+        except Exception as e:
+            logger.error("Error during cleanup", error=str(e))
+        finally:
+            # Force cleanup of any remaining multiprocessing resources
+            import multiprocessing
+            try:
+                # Clean up any remaining resources
+                multiprocessing.active_children()
+            except:
+                pass
+        return False  # Don't suppress exceptions
 
     def _create_driver(self, headless: bool) -> webdriver.Chrome:
         """Create and configure Chrome WebDriver."""
-        options = webdriver.ChromeOptions()
+        options = ChromeOptions()
         if headless:
             options.add_argument("--headless")
-
+        
         # Set download preferences for PDF handling
         prefs = {
             "download.default_directory": os.path.abspath(
@@ -121,9 +143,10 @@ class OpenReviewClient:
         logger.info("Successfully logged in and loaded paper URLs")
         return urls
 
-    def _parse_reviews(self, review_elements) -> List[Review]:
-        """Parse review elements into Review objects."""
+    def _parse_reviews(self, review_elements) -> tuple[List[Review], Optional[MetaReview]]:
+        """Parse review elements into Review objects and separate meta-review."""
         reviews = []
+        meta_review = None
 
         for element in review_elements:
             try:
@@ -135,6 +158,11 @@ class OpenReviewClient:
                     subheading = element.find_element(By.CSS_SELECTOR, ".subheading")
                 except:
                     pass
+
+                # Check if this is a meta-review
+                is_meta_review = False
+                if subheading and "meta review" in subheading.text.lower():
+                    is_meta_review = True
 
                 # Try to find the main content div
                 content_selectors = [
@@ -161,80 +189,99 @@ class OpenReviewClient:
                 else:
                     content = review_content.text
 
-                review = Review(raw_content=content)
+                if is_meta_review:
+                    meta_review = MetaReview(content=content, raw_content=content)
 
-                # Parse reviewer ID and dates from subheading if available
-                try:
-                    if subheading:
-                        subheading_text = subheading.text
-
-                        # Extract reviewer ID using regex
-                        reviewer_match = re.search(
-                            r"by Reviewer\s+(.+?\))", subheading_text
-                        )
-                        if reviewer_match:
-                            review.reviewer_id = reviewer_match.group(1).strip()
-
-                        # Extract submission date (first date)
-                        date_match = re.search(
-                            r"(\d{1,2}\s+\w+\s+\d{4},\s+\d{1,2}:\d{2})", subheading_text
-                        )
-                        if date_match:
-                            review.submission_date = date_match.group(1)
-
-                        # Extract modified date (after "modified:")
-                        modified_match = re.search(
-                            r"modified:\s*(\d{1,2}\s+\w+\s+\d{4},\s+\d{1,2}:\d{2})",
-                            subheading_text,
-                        )
-                        if modified_match:
-                            review.modified_date = modified_match.group(1)
-
-                except Exception as e:
-                    logger.error(
-                        "Error parsing reviewer info from subheading", error=str(e)
-                    )
-                    pass
-
-                # Fallback to original signature extraction if subheading doesn't have reviewer info
-                if not review.reviewer_id:
                     try:
-                        signature_element = element.find_element(
-                            By.CSS_SELECTOR, ".signatures"
+                        if subheading and subheading.text:
+                            subheading_text = subheading.text
+
+                            # Extract submission date (first date)
+                            date_match = re.search(
+                                r"(\d{1,2}\s+\w+\s+\d{4},\s+\d{1,2}:\d{2})", subheading_text
+                            )
+                            if date_match:
+                                meta_review.raw_content = f"Date: {date_match.group(1)}\n\n{content}"
+                    except Exception as e:
+                        logger.error(
+                            "Error parsing meta-review info from subheading", error=str(e)
                         )
-                        if signature_element:
-                            review.reviewer_id = signature_element.text
-                    except:
+                else:
+                    # Create regular Review object
+                    review = Review(raw_content=content)
+
+                    # Parse reviewer ID and dates from subheading if available
+                    try:
+                        if subheading:
+                            subheading_text = subheading.text
+
+                            # Extract reviewer ID using regex
+                            reviewer_match = re.search(
+                                r"by Reviewer\s+(.+?\))", subheading_text
+                            )
+                            if reviewer_match:
+                                review.reviewer_id = reviewer_match.group(1).strip()
+
+                            # Extract submission date (first date)
+                            date_match = re.search(
+                                r"(\d{1,2}\s+\w+\s+\d{4},\s+\d{1,2}:\d{2})", subheading_text
+                            )
+                            if date_match:
+                                review.submission_date = date_match.group(1)
+
+                            # Extract modified date (after "modified:")
+                            modified_match = re.search(
+                                r"modified:\s*(\d{1,2}\s+\w+\s+\d{4},\s+\d{1,2}:\d{2})",
+                                subheading_text,
+                            )
+                            if modified_match:
+                                review.modified_date = modified_match.group(1)
+
+                    except Exception as e:
+                        logger.error(
+                            "Error parsing reviewer info from subheading", error=str(e)
+                        )
                         pass
 
-                # Pattern to find field headers and content
-                field_patterns = {
-                    "paper_summary": r"Paper Summary:\s*(.*?)(?=\n[A-Z]|$)",
-                    "preliminary_recommendation": r"Preliminary Recommendation:\s*(.*?)(?=\n[A-Z]|$)",
-                    "justification_for_recommendation": r"Justification For Recommendation.*?:\s*(.*?)(?=\n[A-Z]|$)",
-                    "confidence_level": r"Confidence Level:\s*(.*?)(?=\n[A-Z]|$)",
-                    "paper_strengths": r"Paper Strengths:\s*(.*?)(?=\n[A-Z]|$)",
-                    "major_weaknesses": r"Major Weaknesses:\s*(.*?)(?=\n[A-Z]|$)",
-                    "minor_weaknesses": r"Minor Weaknesses:\s*(.*?)(?=\n[A-Z]|$)",
-                    "final_recommendation": r"Final Recommendation:\s*(.*?)(?=\n[A-Z]|$)",
-                    "final_justification": r"Final Justification:\s*(.*?)(?=\n[A-Z]|$)",
-                }
+                    # Fallback to original signature extraction if subheading doesn't have reviewer info
+                    if not review.reviewer_id:
+                        try:
+                            signature_element = element.find_element(
+                                By.CSS_SELECTOR, ".signatures"
+                            )
+                            if signature_element:
+                                review.reviewer_id = signature_element.text
+                        except:
+                            pass
 
-                # Extract fields using regex
-                for field_name, pattern in field_patterns.items():
-                    match = re.search(pattern, content, re.DOTALL)
-                    if match:
-                        content_text = match.group(1).strip()
-                        if content_text:
-                            setattr(review, field_name, content_text)
+                    # Pattern to find field headers and content
+                    field_patterns = {
+                        "paper_summary": r"Paper Summary:\s*(.*?)(?=\n[A-Z]|$)",
+                        "preliminary_recommendation": r"Preliminary Recommendation:\s*(.*?)(?=\n[A-Z]|$)",
+                        "justification_for_recommendation": r"Justification For Recommendation.*?:\s*(.*?)(?=\n[A-Z]|$)",
+                        "confidence_level": r"Confidence Level:\s*(.*?)(?=\n[A-Z]|$)",
+                        "paper_strengths": r"Paper Strengths:\s*(.*?)(?=\n[A-Z]|$)",
+                        "major_weaknesses": r"Major Weaknesses:\s*(.*?)(?=\n[A-Z]|$)",
+                        "minor_weaknesses": r"Minor Weaknesses:\s*(.*?)(?=\n[A-Z]|$)",
+                        "final_recommendation": r"Final Recommendation:\s*(.*?)(?=\n[A-Z]|$)",
+                        "final_justification": r"Final Justification:\s*(.*?)(?=\n[A-Z]|$)",
+                    }
 
-                reviews.append(review)
+                    # Extract fields using regex
+                    for field_name, pattern in field_patterns.items():
+                        match = re.search(pattern, content, re.DOTALL)
+                        if match:
+                            content_text = match.group(1).strip()
+                            if content_text:
+                                setattr(review, field_name, content_text)
+
+                    reviews.append(review)
 
             except Exception as e:
                 logger.error("Error parsing review", error=str(e))
                 continue
 
-        return reviews
+        return reviews, meta_review
 
     def _parse_cvpr_rating(
         self, content: str
@@ -315,10 +362,11 @@ class OpenReviewClient:
         # Get reviews
         review_elements = [] if skip_reviews else self._load_reviews()
 
-        # Parse reviews into Review objects
-        detailed_reviews = (
-            self._parse_reviews(review_elements) if review_elements else []
-        )
+        # Parse reviews into Review objects and separate meta-review
+        detailed_reviews = []
+        meta_review = None
+        if review_elements:
+            detailed_reviews, meta_review = self._parse_reviews(review_elements)
 
         # Get PDF URL
         pdf_url = None
@@ -358,16 +406,49 @@ class OpenReviewClient:
             )
 
         # Create submission with URLs
+        # Check withdrawal status
+        withdrawn = self._check_withdrawal_status()
+
         submission = Submission(
             title=title,
             sub_id=sub_id,
             url=url,
             reviews=detailed_reviews,
+            meta_review=meta_review,
             pdf_url=pdf_url,
             rebuttal_url=rebuttal_url,
+            withdrawn=withdrawn,
         )
 
         return submission
+
+    def _check_withdrawal_status(self) -> bool:
+        """Check if the paper has been withdrawn by looking for 'Withdrawal' in subheadings."""
+        try:
+            # Look for elements containing "Withdrawal" in their text
+            withdrawal_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Withdrawal')]")
+            if withdrawal_elements:
+                logger.info(f"Found withdrawal indicators: {len(withdrawal_elements)}")
+                return True
+            
+            # Also check for common withdrawal patterns in page source
+            page_source = self.driver.page_source.lower()
+            withdrawal_patterns = [
+                "withdrawal:",
+                "paper withdrawn",
+                "submission withdrawn",
+                "withdrawn by"
+            ]
+            
+            for pattern in withdrawal_patterns:
+                if pattern in page_source:
+                    logger.info(f"Found withdrawal pattern: {pattern}")
+                    return True
+                    
+            return False
+        except Exception as e:
+            logger.warning(f"Error checking withdrawal status: {e}")
+            return False
 
     @wait_for_page_load(element_id="forum-replies", content_selector=".note.depth-odd")
     def _load_reviews(self) -> List:
@@ -399,7 +480,7 @@ class OpenReviewClient:
             try:
                 # Look for the subheading div to confirm it's an official review
                 subheading = reply.find_element(By.CSS_SELECTOR, ".subheading")
-                if "official review" in subheading.text.lower():
+                if "official review" in subheading.text.lower() or "meta review" in subheading.text.lower():
                     valid_reviews.append(reply)
             except Exception as e:
                 logger.debug("Error filtering review", error=str(e))
@@ -413,13 +494,17 @@ class OpenReviewClient:
         """Get all submission info using sequential processing."""
         logger.info("Loading all submissions", skip_reviews=skip_reviews)
 
-        # Sequential processing only
-        from tqdm import tqdm
-
         subs = []
+        
+        # Use tqdm with enhanced stability measures
         for paper_url in tqdm(self.paper_urls, desc="Loading submissions..."):
-            sub = self.load_submission(paper_url, skip_reviews)
-            subs.append(sub)
+            try:
+                sub = self.load_submission(paper_url, skip_reviews)
+                subs.append(sub)
+               
+            except Exception as e:
+                logger.error(f"Error loading submission {paper_url}", error=str(e))
+                continue
 
         logger.info("Completed loading submissions", count=len(subs))
         return subs

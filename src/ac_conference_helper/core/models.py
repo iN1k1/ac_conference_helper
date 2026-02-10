@@ -2,6 +2,7 @@
 
 from typing import Optional, List
 from pydantic import BaseModel, Field
+import re
 
 import numpy as np
 import pandas as pd
@@ -82,9 +83,6 @@ class Review(BaseModel):
         """Extract numeric confidence from confidence level."""
         if not self.confidence_level:
             return None
-
-        # Extract number from confidence string
-        import re
 
         match = re.search(r"(\d+)", self.confidence_level)
         return int(match.group(1)) if match else None
@@ -215,6 +213,71 @@ class Review(BaseModel):
         print(f"{'='*60}\n")
 
 
+
+class MetaReview(BaseModel):
+    """Class containing meta-review information."""
+
+    content: Optional[str] = None
+    preliminary_decision: Optional[str] = None
+    final_decision: Optional[str] = None
+    raw_content: Optional[str] = None  # Store original HTML content for parsing
+
+    def _extract_decision(self, content_text: str, search_key: str) -> Optional[str]:
+        """Extract decision from meta-review content."""
+        if not content_text:
+            return None
+
+        # Find the section after the search key
+        pattern = rf"{re.escape(search_key)}\s*(.*?)(?=\n|$)"
+        match = re.search(pattern, content_text, re.DOTALL | re.IGNORECASE)
+
+        if not match:
+            return None
+
+        decision_text = match.group(1).strip()
+        if not decision_text:
+            return None
+
+        decision_lower = decision_text.lower()
+
+        # Common decision patterns
+        if any(phrase in decision_lower for phrase in ["clear accept"]):
+            return "Clear Accept"
+        elif any(phrase in decision_lower for phrase in ["clear reject"]):
+            return "Clear Reject"
+        elif any(phrase in decision_lower for phrase in ["needs discussion", "borderline", "discuss"]):
+            return "Needs Discussion"
+        elif "accept" in decision_lower:
+            return "Accept"
+        elif "reject" in decision_lower:
+            return "Reject"
+
+        return decision_text
+
+    def model_post_init(self, __context):
+        """Extract decisions from content after initialization."""
+        try:
+            self.preliminary_decision = self._extract_decision(self.content, "Preliminary Recommendation:")
+            self.final_decision = self._extract_decision(self.content, "Final Recommendation:")  # Often same for meta-reviews
+        except Exception as e:
+            # If decision extraction fails, set to None to prevent crashes
+            self.preliminary_decision = None
+            self.final_decision = None
+            logger.warning(f"Error extracting decisions from meta-review: {e}")
+
+    def __str__(self) -> str:
+        """String representation of meta-review."""
+        output = f"Meta Review:\n"
+        if self.preliminary_decision:
+            output += f"Preliminary Decision: {self.preliminary_decision}\n"
+        if self.final_decision:
+            output += f"Final Decision: {self.final_decision}\n"
+        if self.content:
+            content_preview = self.content[:200] + "..." if len(self.content) > 200 else self.content
+            output += f"Content: {content_preview}\n"
+        return output
+
+
 class Submission(BaseModel):
     """Class containing submission details."""
 
@@ -222,8 +285,10 @@ class Submission(BaseModel):
     sub_id: str
     url: str
     reviews: List[Review] = Field(default_factory=list)  # Detailed reviews
+    meta_review: Optional[MetaReview] = None  # Meta-review information
     pdf_url: Optional[str] = None  # Store PDF URL
     rebuttal_url: Optional[str] = None  # Store rebuttal URL
+    withdrawn: bool = False  # Withdrawal status
 
     model_config = {
         "arbitrary_types_allowed": True  # Allow numpy arrays in computed properties

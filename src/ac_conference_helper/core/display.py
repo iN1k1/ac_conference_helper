@@ -1,12 +1,13 @@
 """Printing and display utilities for conference submission data."""
 
 import argparse
+import os
 from typing import Optional
 
 import pandas as pd
 from tabulate import tabulate
 
-from ac_conference_helper.core.models import Submission
+from ac_conference_helper.core.models import Submission, MetaReview
 from ac_conference_helper.core.models import int_list_to_str
 
 
@@ -22,6 +23,28 @@ class Colors:
     BOLD = "\033[1m"
     UNDERLINE = "\033[4m"
     END = "\033[0m"
+
+
+def format_meta_review_decision(decision: Optional[str]) -> str:
+    """Format meta-review decision with appropriate colors."""
+    if not decision:
+        return f"{Colors.YELLOW}N/A{Colors.END}"
+    
+    decision_lower = decision.lower()
+    if "accept" in decision_lower:
+        if "clear" in decision_lower or "strong" in decision_lower:
+            return f"{Colors.GREEN}{decision}{Colors.END}"
+        else:
+            return f"{Colors.CYAN}{decision}{Colors.END}"
+    elif "reject" in decision_lower:
+        if "clear" in decision_lower or "strong" in decision_lower:
+            return f"{Colors.RED}{decision}{Colors.END}"
+        else:
+            return f"{Colors.MAGENTA}{decision}{Colors.END}"
+    elif "discussion" in decision_lower:
+        return f"{Colors.YELLOW}{decision}{Colors.END}"
+    else:
+        return decision
 
 
 def submissions_to_dataframe(
@@ -42,6 +65,16 @@ def submissions_to_dataframe(
         if include_urls and hasattr(sub, "url"):
             url_link = f"{Colors.BLUE}{sub.url}{Colors.END}"
 
+        # Get meta-review decisions
+        meta_prelim_decision = ""
+        meta_final_decision = ""
+        if hasattr(sub, "meta_review") and sub.meta_review:
+            meta_prelim_decision = format_meta_review_decision(sub.meta_review.preliminary_decision)
+            meta_final_decision = format_meta_review_decision(sub.meta_review.final_decision)
+
+        # Format withdrawal status
+        withdrawal_status = f"{line_color}🚫 WITHDRAWN{Colors.END}" if sub.withdrawn else f"{line_color}✅ Active{Colors.END}"
+
         # Apply color to all text fields in the row
         data.append(
             {
@@ -49,6 +82,9 @@ def submissions_to_dataframe(
                 "ID": f"{line_color}{sub.sub_id}{Colors.END}",
                 "Title": f"{line_color}{sub.title}{Colors.END}",
                 "URL": url_link if url_link else f"{line_color}{Colors.END}",
+                "Status": withdrawal_status,
+                "Meta_Prelim": meta_prelim_decision,
+                "Meta_Final": meta_final_decision,
                 "Ratings": f"{line_color}{int_list_to_str(sub.ratings)}{Colors.END}",
                 "Avg_Rating": f"{line_color}{sub.avg_rating:.2f}{Colors.END}",
                 "Std_Rating": f"{line_color}{sub.std_rating:.2f}{Colors.END}",
@@ -79,6 +115,16 @@ def submissions_to_dataframe_streamlit(
         if include_urls and hasattr(sub, "url"):
             url_link = sub.url
 
+        # Get meta-review decisions
+        meta_prelim_decision = ""
+        meta_final_decision = ""
+        if hasattr(sub, "meta_review") and sub.meta_review:
+            meta_prelim_decision = sub.meta_review.preliminary_decision or "N/A"
+            meta_final_decision = sub.meta_review.final_decision or "N/A"
+
+        # Format withdrawal status
+        withdrawal_status = "🚫 WITHDRAWN" if sub.withdrawn else "✅ Active"
+
         # Add data without ANSI colors
         data.append(
             {
@@ -86,6 +132,9 @@ def submissions_to_dataframe_streamlit(
                 "ID": sub.sub_id,
                 "Title": sub.title,
                 "URL": url_link if url_link else "",
+                "Withdrawal_Status": withdrawal_status,
+                "Meta_Prelim": meta_prelim_decision,
+                "Meta_Final": meta_final_decision,
                 "Status": status,
                 "Ratings": int_list_to_str(sub.ratings),
                 "Avg_Rating": f"{sub.avg_rating:.2f}",
@@ -114,6 +163,9 @@ def print_table_with_format(df: pd.DataFrame, table_format: str) -> None:
         "right",
         "left",
         "right",
+        "left",
+        "left",
+        "left",
         "right",
         "right",
         "right",
@@ -163,12 +215,22 @@ def save_to_csv(subs: list[Submission], filename: str) -> None:
     # Create clean DataFrame without color codes
     clean_data = []
     for idx, sub in enumerate(subs):
+        # Get meta-review decisions
+        meta_prelim_decision = ""
+        meta_final_decision = ""
+        if hasattr(sub, "meta_review") and sub.meta_review:
+            meta_prelim_decision = sub.meta_review.preliminary_decision or "N/A"
+            meta_final_decision = sub.meta_review.final_decision or "N/A"
+            
         clean_data.append(
             {
                 "#": idx + 1,
                 "ID": sub.sub_id,
                 "Title": sub.title,
                 "URL": getattr(sub, "url", ""),
+                "Withdrawal_Status": "WITHDRAWN" if sub.withdrawn else "ACTIVE",
+                "Meta_Prelim": meta_prelim_decision,
+                "Meta_Final": meta_final_decision,
                 "Ratings": int_list_to_str(sub.ratings),
                 "Avg_Rating": f"{sub.avg_rating:.2f}",
                 "Std_Rating": f"{sub.std_rating:.2f}",
@@ -200,6 +262,10 @@ def parse_display_args() -> argparse.Namespace:
     parser.add_argument(
         "--urls", action="store_true", help="Include clickable URLs in output"
     )
+    parser.add_argument(
+        "--save-reviews", type=str, metavar="DIR", default=None,
+        help="Save anonymized reviews to separate txt files in specified directory"
+    )
     return parser.parse_args()
 
 
@@ -226,6 +292,85 @@ def print_incomplete_ratings_table(
     print_table_with_format(df, table_format)
 
 
+def save_anonymized_reviews(subs: list[Submission], output_dir: str = "reviews") -> None:
+    """Save anonymized reviews for each submission to separate txt files."""
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    for sub in subs:
+        if not sub.reviews:
+            continue
+            
+        # Create filename from submission ID and title (sanitized)
+        safe_title = "".join(c for c in sub.title if c.isalnum() or c in (' ', '-', '_')).rstrip()
+        safe_title = safe_title[:50]  # Limit length
+        filename = f"{sub.sub_id}_{safe_title}.txt"
+        filepath = os.path.join(output_dir, filename)
+        
+        # Write anonymized reviews to file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(f"Submission ID: {sub.sub_id}\n")
+            f.write(f"Title: {sub.title}\n")
+            f.write(f"URL: {getattr(sub, 'url', 'N/A')}\n")
+            
+            # Add meta-review if available
+            if hasattr(sub, 'meta_review') and sub.meta_review:
+                f.write(f"\n{'='*80}\n")
+                f.write("META REVIEW\n")
+                f.write(f"{'='*80}\n")
+                if sub.meta_review.preliminary_decision:
+                    f.write(f"Preliminary Decision: {sub.meta_review.preliminary_decision}\n")
+                if sub.meta_review.final_decision:
+                    f.write(f"Final Decision: {sub.meta_review.final_decision}\n")
+                if sub.meta_review.content:
+                    f.write(f"Content:\n{sub.meta_review.content}\n")
+                f.write(f"\n{'='*80}\n")
+            
+            f.write(f"\n{'='*80}\n")
+            f.write("REGULAR REVIEWS\n")
+            f.write(f"{'='*80}\n\n")
+            
+            for i, review in enumerate(sub.reviews, 1):
+                # Extract reviewer ID from format "id (reviewer_name)" and keep only the ID
+                reviewer_id = review.reviewer_id or f"Reviewer_{i}"
+                if ' (' in reviewer_id:
+                    reviewer_id = reviewer_id.split(' (')[0]
+                
+                f.write(f"REVIEWER {reviewer_id}\n")
+                f.write("-" * 40 + "\n")
+                
+                if review.paper_summary:
+                    f.write(f"Paper Summary:\n{review.paper_summary}\n\n")
+                
+                if review.preliminary_recommendation:
+                    f.write(f"Preliminary Recommendation: {review.preliminary_recommendation}\n")
+                
+                if review.justification_for_recommendation:
+                    f.write(f"Justification: {review.justification_for_recommendation}\n")
+                
+                if review.confidence_level:
+                    f.write(f"Confidence Level: {review.confidence_level}\n")
+                
+                if review.paper_strengths:
+                    f.write(f"Strengths: {review.paper_strengths}\n")
+                
+                if review.major_weaknesses:
+                    f.write(f"Major Weaknesses: {review.major_weaknesses}\n")
+                
+                if review.minor_weaknesses:
+                    f.write(f"Minor Weaknesses: {review.minor_weaknesses}\n")
+                
+                if review.final_recommendation:
+                    f.write(f"Final Recommendation: {review.final_recommendation}\n")
+                
+                if review.final_justification:
+                    f.write(f"Final Justification: {review.final_justification}\n")
+                
+                f.write("\n" + "=" * 80 + "\n\n")
+        
+        print(f"Saved anonymized reviews for {sub.sub_id} to {filepath}")
+
+
 def display_results(
     subs: list[Submission], args: Optional[argparse.Namespace] = None
 ) -> None:
@@ -239,6 +384,7 @@ def display_results(
     csv_only = getattr(args, "csv_only", False)
     table_format = getattr(args, "format", "grid")
     output_file = getattr(args, "output", None)
+    save_reviews_dir = getattr(args, "save_reviews", None)
     include_urls = True  # getattr(args, 'urls', False)
 
     if not csv_only:
@@ -251,6 +397,10 @@ def display_results(
 
     if output_file:
         save_to_csv(subs, output_file)
+    
+    # Save anonymized reviews if requested
+    if save_reviews_dir:
+        save_anonymized_reviews(subs, save_reviews_dir)
 
 
 if __name__ == "__main__":
