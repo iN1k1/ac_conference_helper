@@ -188,7 +188,7 @@ def main() -> None:
         # Launch streamlit
         import subprocess
         import sys
-        subprocess.run([sys.executable, "-m", "streamlit", "run", "src/ac_conference_helper/ui/streamlit_chat.py"])
+        subprocess.run([sys.executable, "-m", "streamlit", "run", "../src/ac_conference_helper/ui/streamlit_chat.py"])
         return
 
     # Handle LLM analysis
