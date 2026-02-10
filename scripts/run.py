@@ -25,7 +25,6 @@ from ac_conference_helper.core.models import Submission
 from ac_conference_helper.core.display import display_results
 from ac_conference_helper.core.submission_analyzer import SubmissionAnalyzer
 from ac_conference_helper.config.constants import AVAILABLE_ANALYSES
-from ac_conference_helper.core.chat_system import SubmissionChatSystem
 from ac_conference_helper.config.conference_config import (
     list_available_conferences,
     get_default_conference,
@@ -149,7 +148,6 @@ def main() -> None:
             logger.info("Cleared cache directory", cache_dir=CACHE_DIR)
         else:
             logger.info("No cache directory found to clear")
-        return
 
     # Try to load from cache if requested
     subs = load_submissions_from_cache(args.conf, args.skip_reviews)
