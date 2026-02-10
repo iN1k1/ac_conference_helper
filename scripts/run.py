@@ -129,6 +129,10 @@ def parse_args() -> argparse.Namespace:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Set logging level (DEBUG, INFO, WARNING, ERROR)",
     )
+    parser.add_argument(
+        "--save-reviews", type=str, metavar="DIR", default=None,
+        help="Save anonymized reviews to separate txt files in specified directory"
+    )
     return parser.parse_args()
 
 
@@ -157,8 +161,8 @@ def main() -> None:
         if args.simulate:
             subs = _generate_mock_submissions(5)
         else:
-            client = OpenReviewClient(args.conf, headless=True)
-            subs = client.load_all_submissions(skip_reviews=args.skip_reviews)
+            with OpenReviewClient(args.conf, headless=True) as client:
+                subs = client.load_all_submissions(skip_reviews=args.skip_reviews)
 
         # Save to cache by default (unless explicitly disabled)
         if not args.no_save_cache and not args.simulate:
@@ -192,7 +196,6 @@ def main() -> None:
         return
 
     # Handle LLM analysis
-    enhanced_subs = None
     if args.analyze:
         # Set environment variables for LLM client
         os.environ["OLLAMA_MODEL"] = args.ollama_model
