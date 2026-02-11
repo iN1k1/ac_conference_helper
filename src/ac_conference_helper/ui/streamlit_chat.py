@@ -3,6 +3,7 @@
 import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
+import plotly.express as px
 
 # Load environment variables from .env file
 load_dotenv()
@@ -12,6 +13,7 @@ from ac_conference_helper.config.constants import AVAILABLE_ANALYSES
 from ac_conference_helper.core.llm_integration import create_llm_client_from_env
 from ac_conference_helper.core.chat_system import SubmissionChatSystem
 from ac_conference_helper.core.display import submissions_to_dataframe_streamlit
+from ac_conference_helper.core.models import SubmissionStatus
 
 # Import logging configuration
 from ac_conference_helper.utils.logging_config import get_logger
@@ -48,6 +50,17 @@ st.markdown(
 }
 .stDataFrame {
     width: 100%;
+}
+.strikethrough-row {
+    text-decoration: line-through !important;
+    opacity: 0.6 !important;
+}
+.compact-metric {
+    font-size: 1.1rem;
+}
+.compact-metric-label {
+    font-size: 1rem;
+    font-weight: normal;
 }
 </style>
 """,
@@ -88,7 +101,7 @@ def get_analyzer():
 
 def main():
     """Main Streamlit application."""
-    st.title("📚 Conference Submission Analyzer")
+    st.title("Conference Submission Analytics")
     st.markdown(
         "Interactive analysis system for conference submissions with LLM-powered insights"
     )
@@ -127,13 +140,108 @@ def main():
 
         st.metric("Total Submissions", total_submissions)
         st.metric("Total Reviews", total_reviews)
+        
+        # Meta-review decision statistics
+        st.subheader("📋 Meta-Review Analysis")
+        
+        # Count meta-review decisions for active papers only (exclude withdrawn and desk rejected)
+        active_submissions = [sub for sub in st.session_state.submissions if sub.status == SubmissionStatus.ACTIVE]
+        
+        prelim_accept = 0
+        prelim_reject = 0
+        prelim_discussion = 0
+        prelim_missing = 0
+        
+        final_accept = 0
+        final_reject = 0
+        final_discussion = 0
+        final_missing = 0
+        
+        for sub in active_submissions:
+            if hasattr(sub, "meta_review") and sub.meta_review:
+                # Preliminary decisions
+                if sub.meta_review.preliminary_decision:
+                    prelim_lower = sub.meta_review.preliminary_decision.lower()
+                    if "accept" in prelim_lower:
+                        prelim_accept += 1
+                    elif "reject" in prelim_lower:
+                        prelim_reject += 1
+                    elif "discussion" in prelim_lower:
+                        prelim_discussion += 1
+                else:
+                    prelim_missing += 1
+                
+                # Final decisions
+                if sub.meta_review.final_decision:
+                    final_lower = sub.meta_review.final_decision.lower()
+                    if "accept" in final_lower:
+                        final_accept += 1
+                    elif "reject" in final_lower:
+                        final_reject += 1
+                    elif "discussion" in final_lower:
+                        final_discussion += 1
+                else:
+                    final_missing += 1
+            else:
+                prelim_missing += 1
+                final_missing += 1
+        
+        total_active = len(active_submissions)
+        
+        # Display preliminary stats
+        st.write('<div class="compact-metric-label"><strong>Preliminary Decisions (Active Papers Only):</strong></div>', unsafe_allow_html=True)
+        col_prelim1, col_prelim2, col_prelim3 = st.columns(3)
+        with col_prelim1:
+            st.markdown(f'<div class="compact-metric">Accept<br><strong>{prelim_accept/total_active*100:.1f}%</strong><small>({prelim_accept})</small></div>', unsafe_allow_html=True)
+        with col_prelim2:
+            st.markdown(f'<div class="compact-metric">Reject<br><strong>{prelim_reject/total_active*100:.1f}%</strong><small>({prelim_reject})</small></div>', unsafe_allow_html=True)
+        with col_prelim3:
+            st.markdown(f'<div class="compact-metric">Discussion<br><strong>{prelim_discussion/total_active*100:.1f}%</strong><small>({prelim_discussion})</small></div>', unsafe_allow_html=True)
+        
+        # Display final stats
+        st.write('<div class="compact-metric-label"><strong>Final Decisions (Active Papers Only):</strong></div>', unsafe_allow_html=True)
+        col_final1, col_final2, col_final3 = st.columns(3)
+        with col_final1:
+            st.markdown(f'<div class="compact-metric">Accept<br><strong>{final_accept/total_active*100:.1f}%</strong><small>({final_accept})</small></div>', unsafe_allow_html=True)
+        with col_final2:
+            st.markdown(f'<div class="compact-metric">Reject<br><strong>{final_reject/total_active*100:.1f}%</strong><small>({final_reject})</small></div>', unsafe_allow_html=True)
+        with col_final3:
+            st.markdown(f'<div class="compact-metric">Discussion<br><strong>{final_discussion/total_active*100:.1f}%</strong><small>({final_discussion})</small></div>', unsafe_allow_html=True)
+        
+        # Missing meta-reviews
+        st.write('<div class="compact-metric-label"><strong>Papers Missing Meta-Reviews:</strong></div>', unsafe_allow_html=True)
+        col_missing1, col_missing2 = st.columns(2)
+        with col_missing1:
+            st.markdown(f'<div class="compact-metric"><small>preliminary</small><br>{prelim_missing}</div>', unsafe_allow_html=True)
+        with col_missing2:
+            st.markdown(f'<div class="compact-metric"><small>final</small><br>{final_missing}</div>', unsafe_allow_html=True)
+
+        # Status statistics
+        withdrawn_count = sum(1 for sub in st.session_state.submissions if sub.status == SubmissionStatus.WITHDRAWN)
+        desk_rejected_count = sum(1 for sub in st.session_state.submissions if sub.status == SubmissionStatus.DESK_REJECTED)
+        active_count = sum(1 for sub in st.session_state.submissions if sub.status == SubmissionStatus.ACTIVE)
+        
+        # Calculate percentages
+        total_submissions = len(st.session_state.submissions)
+        withdrawn_pct = (withdrawn_count / total_submissions * 100) if total_submissions > 0 else 0
+        desk_rejected_pct = (desk_rejected_count / total_submissions * 100) if total_submissions > 0 else 0
+        active_pct = (active_count / total_submissions * 100) if total_submissions > 0 else 0
+        
+        st.write('<div class="compact-metric-label"><strong>Status Distribution:</strong></div>', unsafe_allow_html=True)
+        col_status1, col_status2, col_status3 = st.columns(3)
+        with col_status1:
+            st.markdown(f'<div class="compact-metric">🚫<br><strong>{withdrawn_pct:.1f}%</strong><small>({withdrawn_count})</small></div>', unsafe_allow_html=True)
+        with col_status2:
+            st.markdown(f'<div class="compact-metric">📋<br><strong>{desk_rejected_pct:.1f}%</strong><small>({desk_rejected_count})</small></div>', unsafe_allow_html=True)
+        with col_status3:
+            st.markdown(f'<div class="compact-metric">✅<br><strong>{active_pct:.1f}%</strong><small>({active_count})</small></div>', unsafe_allow_html=True)
 
         # Filter options
         st.subheader("🔍 Filters")
 
         # Rating filter
-        min_rating = st.slider("Minimum Average Rating", 1.0, 6.0, 1.0, 0.1)
-        min_reviews = st.slider("Minimum Number of Reviews", 1, 10, 3)
+        min_rating = st.slider("Minimum Average Rating", 0.0, 6.0, 0.0, 0.1)
+        min_reviews = st.slider("Minimum Number of Reviews", 0, 6, 0)
 
         # Apply filters
         filtered_submissions = [
@@ -159,11 +267,23 @@ def main():
             return
 
         # Create dataframe for display
-        df = submissions_to_dataframe_streamlit(filtered_submissions, include_urls=True)
-
+        df = submissions_to_dataframe_streamlit(filtered_submissions, include_urls=False)
+        
+        # Apply strikethrough styling using pandas style
+        def highlight_withdrawn(row):
+            styles = [''] * len(row)
+            status = row.get('status', '')
+            if 'WITHDRAWN' in status or 'DESK REJECTED' in status:
+                for i, col in enumerate(row.index):
+                    styles[i] = 'text-decoration: line-through; opacity: 0.6; color: #666;'
+            return styles
+        
+        # Apply styling and display
+        styled_df = df.style.apply(highlight_withdrawn, axis=1)
+        
         # Display as interactive table with row selection
         event = st.dataframe(
-            df.drop(columns=["#"]),  # Remove index column for cleaner display
+            styled_df,
             width="stretch",
             hide_index=True,
             on_select="rerun",
@@ -199,81 +319,30 @@ def main():
                 st.error("Submission not found!")
                 return
 
-            # Display submission info
-            col1, col2 = st.columns([2, 1])
-
+            # Display submission info in two columns
+            col1, col2 = st.columns([3, 1])  # Give more space to col1, ensure col2 is visible
+            
             with col1:
-                st.subheader(f"📄 {current_submission.title}")
-                st.write(f"**ID:** {current_submission.sub_id}")
+                st.subheader(f"📄 {current_submission.title} ({current_submission.sub_id})")
 
-                # Compact status and ratings info
-                valid_prelim_ratings = [
-                    r for r in current_submission.ratings if r != -1
-                ]
-                valid_final_ratings = [
-                    r for r in current_submission.final_ratings if r != -1
-                ]
-                status = (
-                    "✅ Complete"
-                    if (
-                        len(valid_prelim_ratings) >= 3 and len(valid_final_ratings) >= 3
-                    )
-                    else "⚠️ Incomplete"
-                )
-
-                # Create compact info row
-                info_cols = st.columns(7)
-                with info_cols[0]:
-                    st.metric("Avg Rating", f"{current_submission.avg_rating:.2f}")
-                with info_cols[1]:
-                    st.metric(
-                        "Final Rating", f"{current_submission.avg_final_rating:.2f}"
-                    )
-                with info_cols[2]:
+                # Compact status info
+                col1a, col1b, col1c, col1d = st.columns(4)
+                with col1a:
+                    st.metric("Initial Avg Rating", f"{current_submission.avg_rating:.2f}")
+                with col1b:
+                    st.metric("Final Avg Rating", f"{current_submission.avg_final_rating:.2f}")
+                with col1c:
                     st.metric("Reviews", len(current_submission.reviews))
-                with info_cols[3]:
-                    st.write("**Status:**")
-                    if current_submission.withdrawn:
+                with col1d:
+                    if current_submission.status == SubmissionStatus.DESK_REJECTED:
+                        st.error("📋 Desk Rejected")
+                    elif current_submission.status == SubmissionStatus.WITHDRAWN:
                         st.error("🚫 Withdrawn")
                     else:
                         st.success("✅ Active")
-                with info_cols[4]:
-                    st.write("**Valid Prelim:**")
-                    st.write(f"{len(valid_prelim_ratings)}")
-                with info_cols[5]:
-                    st.write("**Valid Final:**")
-                    st.write(f"{len(valid_final_ratings)}")
-                with info_cols[6]:
-                    st.write("**Complete:**")
-                    complete_status = (
-                        "✅ Complete"
-                        if (
-                            len(valid_prelim_ratings) >= 3 and len(valid_final_ratings) >= 3
-                        )
-                        else "⚠️ Incomplete"
-                    )
-                    st.write(complete_status)
-
-                # Compact URLs row
-                url_cols = st.columns(2)
-                with url_cols[0]:
-                    if (
-                        hasattr(current_submission, "pdf_url")
-                        and current_submission.pdf_url
-                    ):
-                        st.markdown(f"📕 [PDF]({current_submission.pdf_url})")
-                with url_cols[1]:
-                    if (
-                        hasattr(current_submission, "rebuttal_url")
-                        and current_submission.rebuttal_url
-                    ):
-                        st.markdown(f"📄 [Rebuttal]({current_submission.rebuttal_url})")
 
                 # Add meta-review information if available
-                if (
-                    hasattr(current_submission, "meta_review")
-                    and current_submission.meta_review
-                ):
+                if hasattr(current_submission, "meta_review") and current_submission.meta_review:
                     st.subheader("📋 Meta Review")
                     
                     # Create two columns for preliminary and final decisions
@@ -335,8 +404,7 @@ def main():
                                 "Reviewer": review.reviewer_id or f"Reviewer_{i+1}",
                                 "Preliminary Rating": (
                                     review.numeric_rating_preliminary_recommendation
-                                    if review.numeric_rating_preliminary_recommendation
-                                    != -1
+                                    if review.numeric_rating_preliminary_recommendation != -1
                                     else None
                                 ),
                                 "Final Rating": (
@@ -345,14 +413,10 @@ def main():
                                     else None
                                 ),
                                 "Confidence": (
-                                    review.confidence_level
-                                    if review.confidence_level
-                                    else None
+                                    review.confidence_level if review.confidence_level else None
                                 ),
-                                "Preliminary Recommendation": review.preliminary_recommendation
-                                or "N/A",
-                                "Final Recommendation": review.final_recommendation
-                                or "N/A",
+                                "Preliminary Recommendation": review.preliminary_recommendation or "N/A",
+                                "Final Recommendation": review.final_recommendation or "N/A",
                             }
                         )
 
@@ -364,9 +428,9 @@ def main():
                     for i, review in enumerate(current_submission.reviews):
                         reviewer_name = review.reviewer_id or f"Reviewer_{i+1}"
                         with st.expander(f"📄 {reviewer_name} - Review Details", expanded=False):
-                            col1, col2 = st.columns(2)
+                            col1a, col2a = st.columns(2)
                             
-                            with col1:
+                            with col1a:
                                 st.write("**Ratings & Recommendations**")
                                 if review.numeric_rating_preliminary_recommendation != -1:
                                     st.write(f"📊 Preliminary Rating: {review.numeric_rating_preliminary_recommendation}")
@@ -381,7 +445,7 @@ def main():
                                 if review.final_recommendation:
                                     st.write(f"📝 Final: {review.final_recommendation}")
                             
-                            with col2:
+                            with col2a:
                                 st.write("**Review Content**")
                                 if review.paper_summary:
                                     st.write("**📄 Summary:**")
@@ -418,6 +482,17 @@ def main():
             with col2:
                 # Quick analysis buttons
                 st.subheader("🚀 Quick Actions")
+                
+                # PDF and Rebuttal links
+                if hasattr(current_submission, "pdf_url") and current_submission.pdf_url:
+                    st.markdown(f'<a href="{current_submission.pdf_url}" target="_blank"><button style="background-color:#28a745;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;margin:2px 0;">📕 PDF</button></a>', unsafe_allow_html=True)
+                if hasattr(current_submission, "rebuttal_url") and current_submission.rebuttal_url:
+                    st.markdown(f'<a href="{current_submission.rebuttal_url}" target="_blank"><button style="background-color:#17a2b8;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;margin:2px 0;">📄 Rebuttal</button></a>', unsafe_allow_html=True)
+
+                if current_submission.url:
+                    st.markdown(f'<a href="{current_submission.url}" target="_blank"><button style="background-color:#0066cc;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;margin:2px 0;">🔗 OpenReview</button></a>', unsafe_allow_html=True)
+                else:
+                    st.warning("No OpenReview link available")
 
                 if st.button("📝 Get Summary", key="summary"):
                     with st.spinner("Analyzing..."):
@@ -427,9 +502,7 @@ def main():
                         )
                         if enhanced.llm_analyses:
                             st.success("Summary generated!")
-                            st.session_state.last_summary = enhanced.llm_analyses[
-                                0
-                            ].result
+                            st.session_state.last_summary = enhanced.llm_analyses[0].result
 
                 if st.button("📋 Get Meta Review", key="meta_review"):
                     with st.spinner("Analyzing..."):
@@ -439,29 +512,20 @@ def main():
                         )
                         if enhanced.llm_analyses:
                             st.success("Meta review generated!")
-                            st.session_state.last_meta_review = enhanced.llm_analyses[
-                                0
-                            ].result
+                            st.session_state.last_meta_review = enhanced.llm_analyses[0].result
 
                 if st.button("💡 Get Improvements", key="improvements"):
                     with st.spinner("Analyzing..."):
                         analyzer = get_analyzer()
                         enhanced = analyzer.analyze_submission(
-                            current_submission,
-                            [AVAILABLE_ANALYSES[2]],  # improvement_suggestions
+                            current_submission, [AVAILABLE_ANALYSES[2]]  # improvement_suggestions
                         )
                         if enhanced.llm_analyses:
                             st.success("Improvement suggestions generated!")
-                            st.session_state.last_improvements = enhanced.llm_analyses[
-                                0
-                            ].result
+                            st.session_state.last_improvements = enhanced.llm_analyses[0].result
 
-                if current_submission.url:
-                    st.markdown(f'🔗 <a href="{current_submission.url}" target="_blank" rel="noopener noreferrer">Open in OpenReview</a>', unsafe_allow_html=True)
-                else:
-                    st.warning("No OpenReview link available for this submission")
 
-            # Display analysis results
+            # Chat interface below the submission info
             if hasattr(st.session_state, "last_summary"):
                 with st.expander("📝 Summary", expanded=True):
                     st.write(st.session_state.last_summary)
@@ -575,20 +639,36 @@ def main():
         col1, col2 = st.columns(2)
 
         with col1:
-            st.write("**Preliminary Ratings**")
             if all_ratings:
                 rating_counts = pd.Series(all_ratings).value_counts().sort_index()
-                st.bar_chart(rating_counts)
+                
+                # Create a more detailed chart with axis labels
+                fig = px.bar(
+                    x=rating_counts.index, 
+                    y=rating_counts.values,
+                    labels={"x": "Review Score", "y": "Review Count"},
+                    title="Preliminary Ratings Distribution"
+                )
+                fig.update_layout(showlegend=False, height=300)
+                st.plotly_chart(fig, width='stretch')
             else:
                 st.write("No ratings data")
 
         with col2:
-            st.write("**Final Ratings**")
             if all_final_ratings:
                 final_rating_counts = (
                     pd.Series(all_final_ratings).value_counts().sort_index()
                 )
-                st.bar_chart(final_rating_counts)
+                
+                # Create a more detailed chart with axis labels
+                fig = px.bar(
+                    x=final_rating_counts.index, 
+                    y=final_rating_counts.values,
+                    labels={"x": "Review Score", "y": "Review Count"},
+                    title="Final Ratings Distribution"
+                )
+                fig.update_layout(showlegend=False, height=300)
+                st.plotly_chart(fig, width='stretch')
             else:
                 st.write("No final ratings data")
 
@@ -650,16 +730,25 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.write("**Preliminary Meta-Review Decisions**")
             meta_prelim_data = {
                 "Accept": prelim_accept,
                 "Reject": prelim_reject,
                 "Discussion": prelim_discussion
             }
-            st.bar_chart(meta_prelim_data)
+            
+            # Create Plotly chart with axis labels
+            fig = px.bar(
+                x=list(meta_prelim_data.keys()),
+                y=list(meta_prelim_data.values()),
+                labels={"x": "Decision Type", "y": "Count"},
+                title="Preliminary Meta-Review Decisions"
+            )
+            fig.update_layout(showlegend=False, height=300)
+            st.plotly_chart(fig, width='stretch')
             
             # Calculate percentages
             total_prelim = prelim_accept + prelim_reject + prelim_discussion
+            st.subheader(f"Active papers:")
             if total_prelim > 0:
                 st.write(f"✅ Accept: {prelim_accept} ({prelim_accept/total_prelim*100:.1f}%)")
                 st.write(f"❌ Reject: {prelim_reject} ({prelim_reject/total_prelim*100:.1f}%)")
@@ -668,13 +757,21 @@ def main():
                 st.write("No preliminary meta-review decisions found")
         
         with col2:
-            st.write("**Final Meta-Review Decisions**")
             meta_final_data = {
                 "Accept": final_accept,
                 "Reject": final_reject,
                 "Discussion": final_discussion
             }
-            st.bar_chart(meta_final_data)
+            
+            # Create Plotly chart with axis labels
+            fig = px.bar(
+                x=list(meta_final_data.keys()),
+                y=list(meta_final_data.values()),
+                labels={"x": "Decision Type", "y": "Count"},
+                title="Final Meta-Review Decisions"
+            )
+            fig.update_layout(showlegend=False, height=300)
+            st.plotly_chart(fig, width='stretch')
             
             # Calculate percentages
             total_final = final_accept + final_reject + final_discussion
@@ -685,24 +782,25 @@ def main():
             else:
                 st.write("No final meta-review decisions found")
 
-        # Withdrawal Statistics
-        st.subheader("🚫 Withdrawal Analysis")
+        # Status Statistics
+        st.subheader("Status Analysis")
         
         withdrawn_count = sum(1 for sub in st.session_state.submissions if sub.withdrawn)
-        active_count = len(st.session_state.submissions) - withdrawn_count
-        
-        col1, col2, col3 = st.columns(3)
+        desk_rejected_count = sum(1 for sub in st.session_state.submissions if sub.desk_rejected)
+        active_count = total_submissions - withdrawn_count -  desk_rejected_count
+        withdrawal_percentage = (withdrawn_count / total_submissions) * 100
+        desk_rejected_percentage = (desk_rejected_count / total_submissions) * 100
+
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Total Papers", len(st.session_state.submissions))
+            st.metric("Total Papers", total_submissions)
         with col2:
-            st.metric("🚫 Withdrawn", withdrawn_count)
+            st.metric("🚫 Withdrawn", f'{withdrawal_percentage:.2f}% ({withdrawn_count})')
         with col3:
-            st.metric("✅ Active", active_count)
-        
-        if withdrawn_count > 0:
-            withdrawal_percentage = (withdrawn_count / len(st.session_state.submissions)) * 100
-            st.warning(f"📊 Withdrawal Rate: {withdrawal_percentage:.1f}%")
+            st.metric("📋 Desk Rejected", f'{desk_rejected_percentage:.2f}% ({desk_rejected_count})')
+        with col4:
+            st.metric("✅ Active", f'{(active_count/total_submissions)*100:.2f}% ({active_count})')
         
         # Rating Improvement Analysis
         st.subheader("📈 Rating Improvement Analysis")

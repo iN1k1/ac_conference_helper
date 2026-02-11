@@ -2,8 +2,10 @@
 
 from typing import Optional, List
 from pydantic import BaseModel, Field
+from enum import Enum
 import re
-
+import io
+from contextlib import redirect_stdout
 import numpy as np
 import pandas as pd
 
@@ -12,6 +14,13 @@ from ac_conference_helper.utils.logging_config import get_logger
 
 # Configure structured logging
 logger = get_logger(__name__)
+
+
+class SubmissionStatus(str, Enum):
+    """Enum for submission status values."""
+    ACTIVE = "active"
+    WITHDRAWN = "withdrawn"
+    DESK_REJECTED = "desk_rejected"
 
 
 def int_list_to_str(ints: list[int]) -> str:
@@ -288,11 +297,19 @@ class Submission(BaseModel):
     meta_review: Optional[MetaReview] = None  # Meta-review information
     pdf_url: Optional[str] = None  # Store PDF URL
     rebuttal_url: Optional[str] = None  # Store rebuttal URL
-    withdrawn: bool = False  # Withdrawal status
+    status: SubmissionStatus = SubmissionStatus.ACTIVE
 
     model_config = {
         "arbitrary_types_allowed": True  # Allow numpy arrays in computed properties
     }
+
+    @property
+    def withdrawn(self) -> bool:
+        return self.status == SubmissionStatus.WITHDRAWN
+
+    @property
+    def desk_rejected(self) -> bool:
+        return self.status == SubmissionStatus.DESK_REJECTED
 
     @property
     def final_ratings(self) -> list[int]:
@@ -383,15 +400,12 @@ class Submission(BaseModel):
             "has_rebuttal": self.rebuttal_url is not None,
             "pdf_url": self.pdf_url,
             "rebuttal_url": self.rebuttal_url,
+            "status": self.status,
         }
 
     def __str__(self) -> str:
         """String representation uses pretty print by default."""
         # Capture pretty print output
-        import io
-        import sys
-        from contextlib import redirect_stdout
-
         f = io.StringIO()
         with redirect_stdout(f):
             self.pretty_print()

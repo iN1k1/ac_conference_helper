@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
-from ac_conference_helper.core.models import Submission, Review, MetaReview
+from ac_conference_helper.core.models import Submission, Review, MetaReview, SubmissionStatus
 from ac_conference_helper.config.conference_config import get_conference_config, ConferenceConfig
 
 
@@ -406,8 +406,12 @@ class OpenReviewClient:
             )
 
         # Create submission with URLs
-        # Check withdrawal status
-        withdrawn = self._check_withdrawal_status()
+        # Determine submission status
+        status = SubmissionStatus.ACTIVE
+        if self._check_withdrawal_status():
+            status = SubmissionStatus.WITHDRAWN
+        elif self._check_desk_rejection_status():
+            status = SubmissionStatus.DESK_REJECTED
 
         submission = Submission(
             title=title,
@@ -417,7 +421,7 @@ class OpenReviewClient:
             meta_review=meta_review,
             pdf_url=pdf_url,
             rebuttal_url=rebuttal_url,
-            withdrawn=withdrawn,
+            status=status,
         )
 
         return submission
@@ -448,6 +452,33 @@ class OpenReviewClient:
             return False
         except Exception as e:
             logger.warning(f"Error checking withdrawal status: {e}")
+            return False
+
+    def _check_desk_rejection_status(self) -> bool:
+        """Check if the paper has been desk rejected by looking for 'Desk Rejection' in subheadings."""
+        try:
+            # Look for elements containing "Desk Rejection" in their text
+            desk_rejection_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Desk Rejection')]")
+            if desk_rejection_elements:
+                logger.info(f"Found desk rejection indicators: {len(desk_rejection_elements)}")
+                return True
+            
+            # Also check for desk rejection patterns in page source
+            page_source = self.driver.page_source.lower()
+            desk_rejection_patterns = [
+                "desk rejection",
+                "desk reject",
+                "desk rejected"
+            ]
+            
+            for pattern in desk_rejection_patterns:
+                if pattern in page_source:
+                    logger.info(f"Found desk rejection pattern: {pattern}")
+                    return True
+                    
+            return False
+        except Exception as e:
+            logger.warning(f"Error checking desk rejection status: {e}")
             return False
 
     @wait_for_page_load(element_id="forum-replies", content_selector=".note.depth-odd")

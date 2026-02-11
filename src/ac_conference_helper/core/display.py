@@ -7,7 +7,7 @@ from typing import Optional
 import pandas as pd
 from tabulate import tabulate
 
-from ac_conference_helper.core.models import Submission, MetaReview
+from ac_conference_helper.core.models import Submission, MetaReview, SubmissionStatus
 from ac_conference_helper.core.models import int_list_to_str
 
 
@@ -72,8 +72,16 @@ def submissions_to_dataframe(
             meta_prelim_decision = format_meta_review_decision(sub.meta_review.preliminary_decision)
             meta_final_decision = format_meta_review_decision(sub.meta_review.final_decision)
 
-        # Format withdrawal status
-        withdrawal_status = f"{line_color}🚫 WITHDRAWN{Colors.END}" if sub.withdrawn else f"{line_color}✅ Active{Colors.END}"
+        # Format withdrawal and desk rejection status
+        if sub.status == SubmissionStatus.WITHDRAWN:
+            withdrawal_status = f"{line_color}🚫 WITHDRAWN{Colors.END}"
+        elif sub.status == SubmissionStatus.DESK_REJECTED:
+            withdrawal_status = f"{line_color}📋 DESK REJECTED{Colors.END}"
+        else:
+            withdrawal_status = f"{line_color}✅ Active{Colors.END}"
+        
+        # Determine reviews status based on valid ratings
+        reviews_status = f"{line_color}✅ Complete{Colors.END}" if (len(valid_prelim_ratings) >= 3 and len(valid_final_ratings) >= 3) else f"{line_color}⚠️ Incomplete{Colors.END}"
 
         # Apply color to all text fields in the row
         data.append(
@@ -83,6 +91,7 @@ def submissions_to_dataframe(
                 "Title": f"{line_color}{sub.title}{Colors.END}",
                 "URL": url_link if url_link else f"{line_color}{Colors.END}",
                 "Status": withdrawal_status,
+                "reviews_status": reviews_status,
                 "Meta_Prelim": meta_prelim_decision,
                 "Meta_Final": meta_final_decision,
                 "Ratings": f"{line_color}{int_list_to_str(sub.ratings)}{Colors.END}",
@@ -108,7 +117,7 @@ def submissions_to_dataframe_streamlit(
         valid_final_ratings = [r for r in sub.final_ratings if r != -1]
         
         # Determine status based on valid ratings
-        status = "✅ Complete" if (len(valid_prelim_ratings) >= 3 and len(valid_final_ratings) >= 3) else "⚠️ Incomplete"
+        reviews_status = "✅ Complete" if (len(valid_prelim_ratings) >= 3 and len(valid_final_ratings) >= 3) else "⚠️ Incomplete"
 
         # Create URL link if available
         url_link = ""
@@ -122,8 +131,13 @@ def submissions_to_dataframe_streamlit(
             meta_prelim_decision = sub.meta_review.preliminary_decision or "N/A"
             meta_final_decision = sub.meta_review.final_decision or "N/A"
 
-        # Format withdrawal status
-        withdrawal_status = "🚫 WITHDRAWN" if sub.withdrawn else "✅ Active"
+        # Format withdrawal and desk rejection status
+        if sub.status == SubmissionStatus.WITHDRAWN:
+            status = "🚫 WITHDRAWN"
+        elif sub.status == SubmissionStatus.DESK_REJECTED:
+            status = "📋 DESK REJECTED"
+        else:
+            status = "✅ Active"
 
         # Add data without ANSI colors
         data.append(
@@ -131,11 +145,11 @@ def submissions_to_dataframe_streamlit(
                 "#": idx + 1,
                 "ID": sub.sub_id,
                 "Title": sub.title,
-                "URL": url_link if url_link else "",
-                "Withdrawal_Status": withdrawal_status,
+                # "URL": url_link if url_link else "",
+                "status": status,
+                "reviews_status": reviews_status,
                 "Meta_Prelim": meta_prelim_decision,
                 "Meta_Final": meta_final_decision,
-                "Status": status,
                 "Ratings": int_list_to_str(sub.ratings),
                 "Avg_Rating": f"{sub.avg_rating:.2f}",
                 "Std_Rating": f"{sub.std_rating:.2f}",
@@ -228,7 +242,7 @@ def save_to_csv(subs: list[Submission], filename: str) -> None:
                 "ID": sub.sub_id,
                 "Title": sub.title,
                 "URL": getattr(sub, "url", ""),
-                "Withdrawal_Status": "WITHDRAWN" if sub.withdrawn else "ACTIVE",
+                "status": sub.status.value.upper(),
                 "Meta_Prelim": meta_prelim_decision,
                 "Meta_Final": meta_final_decision,
                 "Ratings": int_list_to_str(sub.ratings),
