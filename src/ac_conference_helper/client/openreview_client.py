@@ -287,26 +287,47 @@ class OpenReviewClient:
         self, content: str
     ) -> tuple[Optional[int], Optional[int], Optional[int]]:
         """Parse CVPR rating format."""
-        rating_start = content.find("Preliminary Recommendation: ")
+        rating_start = content.find("Preliminary Recommendation:")
         if rating_start <= 0:
             return None, None, None
 
         try:
             just_start = content.find(
-                "Justification For Recommendation And Suggestions For Rebuttal: "
+                "Justification For Recommendation And Suggestions For Rebuttal:"
             )
-            conf_start = content.find("Confidence Level: ")
+            conf_start = content.find("Confidence Level:")
+            final_rating_start = content.find("Final Rating:")
 
-            rating = int(content[rating_start:just_start].split(":")[1].strip())
-            confidence = int(content[conf_start:].split(":")[1].strip())
+            # Parse rating more carefully
+            if just_start > 0:
+                rating = int(content[rating_start:just_start].split(":")[1].strip())
+            else:
+                # No justification text, find next line or confidence
+                rating_part = content[rating_start:]
+                if conf_start > rating_start:
+                    rating = int(content[rating_start:conf_start].split(":")[1].strip())
+                elif final_rating_start > rating_start:
+                    rating = int(content[rating_start:final_rating_start].split(":")[1].strip())
+                else:
+                    rating = int(content[rating_start:].split(":")[1].strip())
+            
+            # Parse confidence more carefully
+            conf_end = final_rating_start if final_rating_start > 0 else len(content)
+            confidence = int(content[conf_start:conf_end].split(":")[1].strip())
 
             final_rating = None
-            final_rating_start = content.find("Final Rating:")
             final_rating_end = content.find("Final Rating Justification:")
-            if final_rating_start > 0 and final_rating_end > 0:
-                final_rating = int(
-                    content[final_rating_start:final_rating_end].split(":")[1].strip()
-                )
+            if final_rating_start > 0:
+                if final_rating_end > 0:
+                    # Parse with justification
+                    final_rating = int(
+                        content[final_rating_start:final_rating_end].split(":")[1].strip()
+                    )
+                else:
+                    # Parse without justification
+                    final_rating = int(
+                        content[final_rating_start:].split(":")[1].strip()
+                    )
 
             return rating, confidence, final_rating
         except (ValueError, IndexError):
@@ -357,7 +378,7 @@ class OpenReviewClient:
         content = self.driver.find_element(
             By.XPATH, "//div[@class='forum-note']/div[@class='note-content']"
         ).text
-        sub_id = content.split("Number:")[1].strip()
+        sub_id = content.split("Number:")[1].strip().split("\n")[0].strip()
 
         # Get reviews
         review_elements = [] if skip_reviews else self._load_reviews()
@@ -530,7 +551,7 @@ class OpenReviewClient:
         # Use tqdm with enhanced stability measures
         for paper_url in tqdm(self.paper_urls, desc="Loading submissions..."):
             try:
-                sub = self.load_submission(paper_url, skip_reviews)
+                sub = self.load_submission(paper_url, skip_reviews=skip_reviews)
                 subs.append(sub)
                
             except Exception as e:

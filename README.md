@@ -29,13 +29,13 @@ conference_helper/
 │   │   ├── conference_config.py
 │   │   └── constants.py
 │   ├── core/                    # Core functionality
-│   │   ├── models.py
-│   │   ├── display.py
-│   │   ├── chat_system.py
+│   │   ├── models.py            # Data models with enum-based status system
+│   │   ├── display.py           # Display utilities with Plotly visualizations
+│   │   ├── chat_system.py       # AI-powered chat interface
 │   │   ├── submission_analyzer.py
 │   │   └── llm_integration.py
 │   ├── ui/                      # User interfaces
-│   │   └── streamlit_chat.py
+│   │   └── streamlit_chat.py    # Enhanced web interface
 │   └── utils/                   # Utilities
 │       ├── utils.py
 │       └── logging_config.py
@@ -130,37 +130,66 @@ Both methods will launch the same Streamlit web interface at `http://localhost:8
 
 ## ✨ Key Features
 
-- **📊 Multi-format Display**: Terminal tables, Streamlit web interface, CSV export
-- **🚫 Withdrawal Detection**: Auto-detects withdrawn papers with visual indicators (🚫/✅)
-- **📋 Meta-Review Analysis**: Track accept/reject/discussion decisions with statistics
-- **📈 Interactive Analytics**: Adjustable rating thresholds, improvement/decline tracking
-- **📝 Complete Review Content**: Expandable sections showing all reviewer details
+- **🎯 Smart Status Management**: Enum-based system with visual indicators (🚫/📋/✅)
+- **📊 Professional Charts**: Interactive Plotly visualizations with proper axis labels
+- **📈 Advanced Analytics**: Rating distribution, meta-review analysis, improvement tracking
 - **🤖 AI Integration**: LLM-powered summaries, meta-reviews, and chat interface
-- **🔗 Direct Integration**: OpenReview links, real-time updates, mobile-responsive
+- **🌐 Modern Web UI**: Interactive dashboard with filtering and mobile-responsive design
+- **📝 Complete Review Display**: Expandable sections with full reviewer details
+- **🔗 OpenReview Integration**: Direct links and real-time data fetching
 
-## 🌐 Web Interface
-
+### 🌐 Modern Web Interface
 Access at `http://localhost:8501` after launching.
 
-Features:
-- Interactive submission browser with filtering
+**Features:**
+- Interactive submission browser with advanced filtering
 - AI-powered chat for paper analysis
-- Analytics dashboard with visualizations
-- Detailed review content display
+- Professional analytics dashboard with visualizations
+- Detailed review content display with expandable sections
 - One-click analysis actions
+- Mobile-responsive design
+- Real-time status updates
+
+## 🏗️ Technical Architecture
+
+### Status System Design
+The application uses a modern enum-based status system:
+
+```python
+class SubmissionStatus(str, Enum):
+    """Enum for submission status values."""
+    ACTIVE = "active"
+    WITHDRAWN = "withdrawn"
+    DESK_REJECTED = "desk_rejected"
+```
+
+**Benefits:**
+- **Type Safety**: Prevents invalid status values
+- **IDE Support**: Autocomplete and type checking
+- **Maintainability**: Easy to extend with new status types
+- **Backward Compatibility**: Properties for legacy code support
+
+### Visualization Stack
+- **Plotly Express**: Professional interactive charts
+- **Proper Axis Labels**: Clear data visualization
+- **Responsive Design**: Adapts to different screen sizes
+- **Consistent Styling**: Unified visual language across charts
 
 ## 🙏 Acknowledgments
 
 This project was inspired by and builds upon the excellent work done in:
 - **[openreview_helper](https://github.com/arunmallya/openreview_helper)** by Arun Mallya
 
-This enhanced version adds:
-- Modern uv-based dependency management
-- Streamlit web interface with analytics
-- Enhanced LLM integration
-- Withdrawal detection and tracking
-- Interactive rating analysis
-- Improved UI with color indicators
+### Enhanced Features in This Version
+- **Modern uv-based dependency management**
+- **Enum-based status system with type safety**
+- **Plotly Express visualizations with proper axis labels**
+- **Enhanced Streamlit web interface**
+- **Professional analytics dashboard**
+- **Improved LLM integration**
+- **Withdrawal and desk rejection detection**
+- **Interactive rating analysis with improvement tracking**
+- **Mobile-responsive design**
+- **Better error handling and logging**
 
 Thank you to Arun Mallya and contributors for the original implementation!
-

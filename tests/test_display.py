@@ -144,7 +144,7 @@ class TestSubmissionsToDataFrameStreamlit:
         
         df = submissions_to_dataframe_streamlit([sub])
         assert len(df) == 1
-        assert df.iloc[0]['Status'] == "✅ Complete"
+        assert df.iloc[0]['reviews_status'] == "✅ Complete"
 
     def test_incomplete_ratings_status(self):
         """Test status for incomplete ratings."""
@@ -162,7 +162,7 @@ class TestSubmissionsToDataFrameStreamlit:
         
         df = submissions_to_dataframe_streamlit([sub])
         assert len(df) == 1
-        assert df.iloc[0]['Status'] == "⚠️ Incomplete"
+        assert df.iloc[0]['reviews_status'] == "⚠️ Incomplete"
 
     def test_no_ansi_colors(self):
         """Test that no ANSI colors are included."""
@@ -190,10 +190,11 @@ class TestPrintTableWithFormat:
     @patch('tabulate.tabulate')
     def test_print_table_with_format(self, mock_tabulate):
         """Test print_table_with_format calls tabulate correctly."""
-        # Create an 11-column DataFrame to match the hardcoded colalign list
+        # Create a 15-column DataFrame to match the hardcoded colalign list
         df = pd.DataFrame({
             'Col1': [1], 'Col2': [2], 'Col3': [3], 'Col4': [4], 'Col5': [5],
-            'Col6': [6], 'Col7': [7], 'Col8': [8], 'Col9': [9], 'Col10': [10], 'Col11': [11]
+            'Col6': [6], 'Col7': [7], 'Col8': [8], 'Col9': [9], 'Col10': [10], 
+            'Col11': [11], 'Col12': [12], 'Col13': [13], 'Col14': [14], 'Col15': [15]
         })
         mock_tabulate.return_value = "formatted table"
         
@@ -212,10 +213,11 @@ class TestPrintTableWithFormat:
 
     def test_colalign_configuration(self):
         """Test that colalign is properly configured."""
-        # Create an 11-column DataFrame to match the hardcoded colalign list
+        # Create a 15-column DataFrame to match the hardcoded colalign list
         df = pd.DataFrame({
             'Col1': [1], 'Col2': [2], 'Col3': [3], 'Col4': [4], 'Col5': [5],
-            'Col6': [6], 'Col7': [7], 'Col8': [8], 'Col9': [9], 'Col10': [10], 'Col11': [11]
+            'Col6': [6], 'Col7': [7], 'Col8': [8], 'Col9': [9], 'Col10': [10], 
+            'Col11': [11], 'Col12': [12], 'Col13': [13], 'Col14': [14], 'Col15': [15]
         })
         
         with patch('tabulate.tabulate') as mock_tabulate:
@@ -225,7 +227,7 @@ class TestPrintTableWithFormat:
                 args, kwargs = mock_tabulate.call_args
                 if 'colalign' in kwargs:
                     colalign = kwargs['colalign']
-                    expected = ["right", "right", "left", "right", "right", "right", "right", "right", "right", "right", "right"]
+                    expected = ["right", "right", "left", "right", "left", "left", "left", "right", "right", "right", "right", "right", "right", "right", "right"]
                     assert colalign == expected
 
 
