@@ -134,21 +134,9 @@ Both methods will launch the same Streamlit web interface at `http://localhost:8
 - **📊 Professional Charts**: Interactive Plotly visualizations with proper axis labels
 - **📈 Advanced Analytics**: Rating distribution, meta-review analysis, improvement tracking
 - **🤖 AI Integration**: LLM-powered summaries, meta-reviews, and chat interface
-- **🌐 Modern Web UI**: Interactive dashboard with filtering and mobile-responsive design
+- **🌐 Modern Web UI**: Interactive streamlit dashboard with filtering and mobile-responsive design
 - **📝 Complete Review Display**: Expandable sections with full reviewer details
 - **🔗 OpenReview Integration**: Direct links and real-time data fetching
-
-### 🌐 Modern Web Interface
-Access at `http://localhost:8501` after launching.
-
-**Features:**
-- Interactive submission browser with advanced filtering
-- AI-powered chat for paper analysis
-- Professional analytics dashboard with visualizations
-- Detailed review content display with expandable sections
-- One-click analysis actions
-- Mobile-responsive design
-- Real-time status updates
 
 ## 🙏 Acknowledgments
 
