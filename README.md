@@ -128,27 +128,39 @@ uv run python scripts/run.py --chat
 
 Both methods will launch the same Streamlit web interface at `http://localhost:8501`. The `--chat` flag automatically launches the Streamlit interface from the correct package location.
 
+## ✨ Key Features
+
+- **📊 Multi-format Display**: Terminal tables, Streamlit web interface, CSV export
+- **🚫 Withdrawal Detection**: Auto-detects withdrawn papers with visual indicators (🚫/✅)
+- **📋 Meta-Review Analysis**: Track accept/reject/discussion decisions with statistics
+- **📈 Interactive Analytics**: Adjustable rating thresholds, improvement/decline tracking
+- **📝 Complete Review Content**: Expandable sections showing all reviewer details
+- **🤖 AI Integration**: LLM-powered summaries, meta-reviews, and chat interface
+- **🔗 Direct Integration**: OpenReview links, real-time updates, mobile-responsive
+
 ## 🌐 Web Interface
 
-The modern web interface provides:
-- **📋 Interactive Submission Browser** - Filter, sort, and explore submissions
-- **💬 AI-Powered Chat** - Ask questions about submissions with LLM assistance  
-- **📈 Analytics Dashboard** - Visualizations and statistics
-- **🚀 Quick Actions** - One-click analysis (summary, recommendations, improvements)
-- **📱 Responsive Design** - Works on desktop and mobile devices
-
 Access at `http://localhost:8501` after launching.
+
+Features:
+- Interactive submission browser with filtering
+- AI-powered chat for paper analysis
+- Analytics dashboard with visualizations
+- Detailed review content display
+- One-click analysis actions
 
 ## 🙏 Acknowledgments
 
 This project was inspired by and builds upon the excellent work done in:
 - **[openreview_helper](https://github.com/arunmallya/openreview_helper)** by Arun Mallya
 
-The original project provided the foundation and inspiration for this enhanced version with additional features like:
+This enhanced version adds:
 - Modern uv-based dependency management
-- Streamlit web interface
+- Streamlit web interface with analytics
 - Enhanced LLM integration
-- Improved caching and configuration options
+- Withdrawal detection and tracking
+- Interactive rating analysis
+- Improved UI with color indicators
 
 Thank you to Arun Mallya and contributors for the original implementation!
 

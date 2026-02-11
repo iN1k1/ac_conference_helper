@@ -157,15 +157,14 @@ def main() -> None:
     subs = load_submissions_from_cache(args.conf, args.skip_reviews)
 
     # If no cache loaded, fetch normally
-    if subs is None:
-        if args.simulate:
-            subs = _generate_mock_submissions(5)
-        else:
-            with OpenReviewClient(args.conf, headless=True) as client:
+    if args.simulate:
+        subs = _generate_mock_submissions(5)
+    else:
+        with OpenReviewClient(args.conf, headless=True) as client:
                 subs = client.load_all_submissions(skip_reviews=args.skip_reviews)
 
         # Save to cache by default (unless explicitly disabled)
-        if not args.no_save_cache and not args.simulate:
+        if not args.no_save_cache:
             save_submissions_to_cache(subs, args.conf, args.skip_reviews)
 
     # Handle chat mode - launch Streamlit web interface
@@ -216,20 +215,42 @@ def main() -> None:
 
 def _generate_mock_submissions(count: int) -> list[Submission]:
     """Generate mock submission data for simulation."""
+    from ac_conference_helper.core.models import MetaReview
+    import random
+    
     subs = []
     for _ in range(count):
         ratings = [random.choice(range(1, 6)) for _ in range(random.randint(0, 3))]
         final_ratings = [
             random.choice(range(1, 6)) for _ in range(random.randint(0, 3))
         ]
+        
+        # Generate mock meta-review
+        meta_decisions = ["Accept", "Reject", "Needs Discussion", "Clear Accept", "Clear Reject"]
+        meta_review = MetaReview(
+            content=f"This is a mock meta-review for submission {random.randint(1000, 9999)} with detailed analysis and recommendations.",
+            preliminary_decision=random.choice(meta_decisions),
+            final_decision=random.choice(meta_decisions)
+        )
+        
+        # Generate mock URLs
+        base_id = random.randint(1000, 20000)
+        pdf_url = f"https://openreview.net/pdf?id={base_id}"
+        rebuttal_url = f"https://openreview.net/rebuttal?id={base_id}"
+        
         subs.append(
             Submission(
                 title="Title " + random.choice(string.ascii_uppercase),
-                sub_id=str(random.choice(range(1000, 20000))),
+                sub_id=str(base_id),
+                url=f"https://openreview.net/forum?id={base_id}",
                 ratings=ratings,
                 confidences=[random.choice(range(1, 5)) for _ in range(len(ratings))],
                 final_ratings=final_ratings,
                 reviews=[],  # Empty reviews for mock data
+                meta_review=meta_review,
+                pdf_url=pdf_url,
+                rebuttal_url=rebuttal_url,
+                withdrawn=random.choice([True, False]) if random.random() < 0.1 else False,  # 10% chance of withdrawal
             )
         )
     return subs
