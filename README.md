@@ -150,31 +150,6 @@ Access at `http://localhost:8501` after launching.
 - Mobile-responsive design
 - Real-time status updates
 
-## 🏗️ Technical Architecture
-
-### Status System Design
-The application uses a modern enum-based status system:
-
-```python
-class SubmissionStatus(str, Enum):
-    """Enum for submission status values."""
-    ACTIVE = "active"
-    WITHDRAWN = "withdrawn"
-    DESK_REJECTED = "desk_rejected"
-```
-
-**Benefits:**
-- **Type Safety**: Prevents invalid status values
-- **IDE Support**: Autocomplete and type checking
-- **Maintainability**: Easy to extend with new status types
-- **Backward Compatibility**: Properties for legacy code support
-
-### Visualization Stack
-- **Plotly Express**: Professional interactive charts
-- **Proper Axis Labels**: Clear data visualization
-- **Responsive Design**: Adapts to different screen sizes
-- **Consistent Styling**: Unified visual language across charts
-
 ## 🙏 Acknowledgments
 
 This project was inspired by and builds upon the excellent work done in:
